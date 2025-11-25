@@ -12,7 +12,6 @@ import os
 import yaml
 import tempfile
 import subprocess
-import uuid
 import threading
 from text_fit_draw import draw_text_auto
 from image_fit_paste import paste_image_auto
@@ -223,41 +222,66 @@ class ManosabaTextBox:
     def cut_all_and_get_text(self) -> str:
         """模拟全选和剪切操作，返回剪切得到的文本内容"""
         pyperclip.copy("")
+        if PLATFORM == 'darwin':
+            self.kbd_controller.press(Key.cmd)
+            self.kbd_controller.press('a')
+            self.kbd_controller.release('a')
+            self.kbd_controller.press('x')
+            self.kbd_controller.release('x')
+            self.kbd_controller.release(Key.cmd)
 
-        self.kbd_controller.press(Key.ctrl if PLATFORM != 'darwin' else Key.cmd)
-        self.kbd_controller.press('a')
-        self.kbd_controller.release('a')
-        self.kbd_controller.press('x')
-        self.kbd_controller.release('x')
-        self.kbd_controller.release(Key.ctrl if PLATFORM != 'darwin' else Key.cmd)
+        elif PLATFORM.startswith('win'):
+            keyboard.send("CTRL+A")
+            keyboard.send("CTRL+X")
+
         time.sleep(self.KEY_DELAY)
-
         new_clip = pyperclip.paste()
         return new_clip
 
     def try_get_image(self) -> Image.Image | None:
         """尝试从剪贴板获取图像"""
-        try:
-            data = pyclip.paste()
+        if PLATFORM=='darwin':
+            try:
+                data = pyclip.paste()
 
-            if isinstance(data, bytes) and len(data) > 0:
-                try:
-                    text = data.decode('utf-8')
-                    if len(text) < 10000:
+                if isinstance(data, bytes) and len(data) > 0:
+                    try:
+                        text = data.decode('utf-8')
+                        if len(text) < 10000:
+                            return None
+                    except (UnicodeDecodeError, AttributeError):
+                        pass
+
+                    try:
+                        image = Image.open(io.BytesIO(data))
+                        image.load()
+                        return image
+                    except Exception:
                         return None
-                except (UnicodeDecodeError, AttributeError):
-                    pass
 
+            except Exception as e:
+                print(f"无法从剪贴板获取图像: {e}")
+        elif PLATFORM.startswith('win'):
+            try:
+                win32clipboard.OpenClipboard()
+                if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_DIB):
+                    data = win32clipboard.GetClipboardData(win32clipboard.CF_DIB)
+                    if data:
+                        # 将 DIB 数据转换为字节流，供 Pillow 打开
+                        bmp_data = data
+                        # DIB 格式缺少 BMP 文件头，需要手动加上
+                        # BMP 文件头是 14 字节，包含 "BM" 标识和文件大小信息
+                        header = b'BM' + (len(bmp_data) + 14).to_bytes(4, 'little') + b'\x00\x00\x00\x00\x36\x00\x00\x00'
+                        image = Image.open(io.BytesIO(header + bmp_data))
+                        return image
+            except Exception as e:
+                print("无法从剪贴板获取图像：", e)
+            finally:
                 try:
-                    image = Image.open(io.BytesIO(data))
-                    image.load()
-                    return image
-                except Exception:
-                    return None
-
-        except Exception as e:
-            print(f"无法从剪贴板获取图像: {e}")
-        return None
+                    win32clipboard.CloseClipboard()
+                except:
+                    pass
+            return None
 
     def start(self) -> str:
         """生成并发送图片，返回状态消息"""
