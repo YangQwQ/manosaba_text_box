@@ -36,7 +36,7 @@ class SettingsWindow:
         self.setup_ui()
 
         # 确保界面状态正确
-        self.on_ai_model_changed()
+        self.setup_model_parameters()
     def test_ai_connection(self):
         """测试AI连接 - 这会触发模型初始化"""
         selected_model = self.ai_model_var.get()
@@ -138,18 +138,18 @@ class SettingsWindow:
         sentiment_frame = ttk.LabelFrame(parent, text="情感匹配设置", padding="10")
         sentiment_frame.pack(fill=tk.X, pady=5)
 
-        # 启用情感匹配
+        # # 启用情感匹配
         sentiment_settings = self.settings.get("sentiment_matching", {})
-        self.sentiment_enabled_var = tk.BooleanVar(
-            value=sentiment_settings.get("enabled", False)
-        )
-        sentiment_enabled_cb = ttk.Checkbutton(
-            sentiment_frame,
-            text="启用情感匹配功能",
-            variable=self.sentiment_enabled_var
-            # command=self.on_sentiment_enabled_changed
-        )
-        sentiment_enabled_cb.grid(row=0, column=0, columnspan=3, sticky=tk.W, pady=5)
+        # self.sentiment_enabled_var = tk.BooleanVar(
+        #     value=sentiment_settings.get("enabled", False)
+        # )
+        # sentiment_enabled_cb = ttk.Checkbutton(
+        #     sentiment_frame,
+        #     text="启用情感匹配功能",
+        #     variable=self.sentiment_enabled_var
+        #     # command=self.on_sentiment_enabled_changed
+        # )
+        # sentiment_enabled_cb.grid(row=0, column=0, columnspan=3, sticky=tk.W, pady=5)
 
         # AI模型选择
         ttk.Label(sentiment_frame, text="AI模型:").grid(
@@ -169,7 +169,7 @@ class SettingsWindow:
             width=15
         )
         ai_model_combo.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
-        ai_model_combo.bind("<<ComboboxSelected>>", self.on_ai_model_changed)
+        ai_model_combo.bind("<<ComboboxSelected>>", self.setup_model_parameters)
 
         # 连接测试按钮
         self.test_btn = ttk.Button(
@@ -189,9 +189,9 @@ class SettingsWindow:
 
         # 情感匹配说明
         ttk.Label(sentiment_frame, 
-                text="注：启用后会自动分析文本情感并选择对应表情，仅对文本内容生效", 
+                text="注：在主界面启用情感匹配以进行连接，点击测试连接按钮也行，启用后会使用ai来自动选择表情", 
                 font=("", 8), foreground="gray").grid(
-            row=3, column=0, columnspan=3, sticky=tk.W, pady=2
+            row=0, column=0, columnspan=3, sticky=tk.W, pady=2
         )
 
         sentiment_frame.columnconfigure(1, weight=1)
@@ -383,8 +383,7 @@ class SettingsWindow:
         """获取可用字体列表，优先显示项目字体"""
         fonts_dir = os.path.join(self.core.config.BASE_PATH, "assets", "fonts")
         project_fonts = []
-        # system_fonts = []
-        
+
         # 获取项目字体
         if os.path.exists(fonts_dir):
             for file in os.listdir(fonts_dir):
@@ -537,9 +536,6 @@ class SettingsWindow:
         entry = ttk.Entry(parent, textvariable=hotkey_var, width=20, state="readonly")
         entry.grid(row=row, column=1, padx=5, pady=2, sticky=tk.W)
 
-        # 提示信息
-        # ttk.Label(parent, text="在keymap.yml中修改").grid(row=row, column=2, padx=5, pady=2)
-
     def create_character_hotkey_row(
         self, parent, label, key, hotkey_value, current_char, character_options, row
     ):
@@ -618,28 +614,6 @@ class SettingsWindow:
 
         self.settings["quick_characters"] = quick_characters
 
-        # 即时保存设置
-        # self.core.save_gui_settings(self.settings)
-
-        # 更新核心的GUI设置引用 (这个有用吗)
-        # self.core.gui_settings = self.settings.copy()
-
-    def on_ai_model_changed(self, event=None):
-        """AI模型选择改变事件"""
-        self.setup_model_parameters()
-        # 移除立即保存设置的调用，只在应用/保存时保存
-        # self.on_setting_changed()
-
-    # def on_sentiment_enabled_changed(self):
-    #     """情感匹配启用状态改变事件"""
-    #     # 调用设置改变回调
-    #     self.on_setting_changed()
-        
-    #     # 如果刚刚启用情感匹配且分析器未初始化，则执行初始化
-    #     if (self.sentiment_enabled_var.get() and 
-    #         not self.core.sentiment_analyzer_initialized):
-    #         self.core._initialize_sentiment_analyzer_async()
-
     def on_save(self):
         """保存设置并关闭窗口"""
         self.on_setting_changed()
@@ -664,6 +638,8 @@ class ManosabaGUI:
         self.core = ManosabaCore()
         # 设置GUI回调
         self.core.set_gui_callback(self.on_sentiment_analyzer_status_changed)
+        # 设置状态更新回调
+        self.core.set_status_callback(self.update_status)
 
         self.root = tk.Tk()
         self.root.title("魔裁文本框生成器")
@@ -804,7 +780,6 @@ class ManosabaGUI:
             command=self.on_auto_send_changed,
         ).grid(row=0, column=1, sticky=tk.W, padx=5)
 
-        # 添加情感匹配复选框
         sentiment_settings = self.core.get_gui_settings().get("sentiment_matching", {})
         self.sentiment_matching_var = tk.BooleanVar(value=sentiment_settings.get("enabled", False))
         self.sentiment_checkbutton = ttk.Checkbutton(
@@ -1226,51 +1201,67 @@ class ManosabaGUI:
         """自动发送设置改变"""
         self.core.config.AUTO_SEND_IMAGE = self.auto_send_var.get()
 
-    def on_sentiment_analyzer_status_changed(self, initialized: bool, enabled: bool):
+    def on_sentiment_analyzer_status_changed(self, initialized: bool, enabled: bool, initializing: bool = False):
         """情感分析器状态变化回调"""
         def update_ui():
-            self.sentiment_matching_var.set(enabled)
-            self.update_sentiment_button_state()
-            # 如果状态变化，更新设置
-            if enabled != self.core.gui_settings.get("sentiment_matching", {}).get("enabled", False):
-                self.core.gui_settings["sentiment_matching"]["enabled"] = enabled
-                self.core.save_gui_settings(self.core.gui_settings)
+            if initializing:
+                # 正在初始化，禁用复选框
+                self.sentiment_checkbutton.config(state="disabled")
+                self.sentiment_matching_var.set(True)  # 初始化期间保持选中状态
+                self.update_status("正在初始化情感分析器...")
+            else:
+                # 初始化完成，启用复选框
+                self.sentiment_checkbutton.config(state="normal")
+                self.sentiment_matching_var.set(enabled)
+                if enabled:
+                    self.update_status("情感匹配功能已启用")
+                else:
+                    self.update_status("情感匹配功能已禁用")
         
         # 在UI线程中执行更新
         self.root.after(0, update_ui)
 
     def update_sentiment_button_state(self):
         """更新情感匹配按钮状态"""
-        if self.core.sentiment_analyzer_initialized:
-            # 初始化成功，启用按钮并根据设置决定选中状态
+        # 根据当前状态设置复选框状态
+        sentiment_settings = self.core.get_gui_settings().get("sentiment_matching", {})
+        current_enabled = sentiment_settings.get("enabled", False)
+        
+        if self.core.sentiment_analyzer_initializing:
+            # 正在初始化，禁用复选框
+            self.sentiment_checkbutton.config(state="disabled")
+            self.sentiment_matching_var.set(True)
+        elif self.core.sentiment_analyzer_initialized:
+            # 初始化成功，启用复选框
             self.sentiment_checkbutton.config(state="normal")
-            sentiment_settings = self.core.get_gui_settings().get("sentiment_matching", {})
-            current_enabled = sentiment_settings.get("enabled", False)
             self.sentiment_matching_var.set(current_enabled)
         else:
-            # 初始化失败，禁用按钮并取消选中
-            self.sentiment_checkbutton.config(state="disabled")
+            # 未初始化，启用复选框但状态为未选中
+            self.sentiment_checkbutton.config(state="normal")
             self.sentiment_matching_var.set(False)
 
+    def on_sentiment_matching_clicked(self):
+        """情感匹配按钮点击事件"""
+        sentiment_settings = self.core.get_gui_settings().get("sentiment_matching", {})
+        current_enabled = sentiment_settings.get("enabled", False)
+        
+        if not current_enabled:
+            # 如果当前未启用，尝试启用
+            if not self.core.sentiment_analyzer_initialized:
+                # 如果未初始化，则开始初始化
+                self.update_status("正在初始化情感分析器...")
+                self.core.toggle_sentiment_matching()
+            else:
+                # 如果已初始化，直接启用
+                self.core.toggle_sentiment_matching()
+        else:
+            # 如果当前已启用，则禁用
+            self.core.toggle_sentiment_matching()
+    
     def on_sentiment_matching_changed(self):
         """情感匹配设置改变"""
-        # 只有在初始化成功的情况下才允许更改
-        if not self.core.sentiment_analyzer_initialized:
-            # 如果未初始化，强制取消选中
-            self.sentiment_matching_var.set(False)
-            return
-            
-        settings = self.core.get_gui_settings()
-        if "sentiment_matching" not in settings:
-            settings["sentiment_matching"] = {}
-        
-        new_enabled = self.sentiment_matching_var.get()
-        settings["sentiment_matching"]["enabled"] = new_enabled
-        self.core.save_gui_settings(settings)
-        
-        # 如果启用情感匹配但分析器未初始化，则执行初始化
-        if new_enabled and not self.core.sentiment_analyzer_initialized:
-            self.core._initialize_sentiment_analyzer_async()
+        # 调用core的切换方法
+        self.core.toggle_sentiment_matching()
         
     def generate_image(self):
         """生成图片"""
