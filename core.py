@@ -33,7 +33,7 @@ class ManosabaCore:
         self.clipboard_manager = ClipboardManager()
 
         # 加载配置
-        self.config_loader = ConfigLoader(self.config.BASE_PATH)
+        self.config_loader = ConfigLoader()
         self.mahoshojo = {}
         self.text_configs_dict = {}
         self.character_list = []

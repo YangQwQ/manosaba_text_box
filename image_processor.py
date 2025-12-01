@@ -2,11 +2,12 @@
 
 import os
 import random
-import io
+# import io
 from PIL import Image, ImageDraw, ImageFont
 
 from text_fit_draw import draw_text_auto
 from image_fit_paste import paste_image_auto
+from path_utils import get_resource_path, get_base_path
 
 
 class ImageProcessor:
@@ -67,9 +68,8 @@ class ImageProcessor:
     def _load_background(self, background_index: int) -> Image.Image:
         """加载背景图片到缓存"""
         if background_index not in self.background_cache:
-            background_path = os.path.join(
-                self.base_path, "assets", "background", f"c{background_index}.png"
-            )
+            # 使用资源路径获取
+            background_path = get_resource_path(os.path.join("assets", "background", f"c{background_index}.png"))
             if os.path.exists(background_path):
                 self.background_cache[background_index] = Image.open(
                     background_path
@@ -91,13 +91,12 @@ class ImageProcessor:
             return self.character_cache[cache_key].copy()
 
         # 缓存未命中，从文件加载
-        overlay_path = os.path.join(
-            self.base_path,
+        overlay_path = get_resource_path(os.path.join(
             "assets",
             "chara",
             character_name,
-            f"{character_name} ({emotion_index}).png",
-        )
+            f"{character_name} ({emotion_index}).png"
+        ))
 
         if os.path.exists(overlay_path):
             image = Image.open(overlay_path).convert("RGBA")
@@ -124,10 +123,10 @@ class ImageProcessor:
         """获取角色字体文件路径"""
         if character_name in self.mahoshojo:
             font_file = self.mahoshojo[character_name].get("font", "font3.ttf")
-            return os.path.join(self.base_path, "assets", "fonts", font_file)
+            return get_resource_path(os.path.join("assets", "fonts", font_file))
         else:
             # 默认字体
-            return os.path.join(self.base_path, "assets", "fonts", "font3.ttf")
+            return get_resource_path(os.path.join("assets", "fonts", "font3.ttf"))
 
     def _get_font(self, font_path: str, font_size: int) -> ImageFont.FreeTypeFont:
         """获取字体对象，带缓存"""
@@ -138,9 +137,7 @@ class ImageProcessor:
             except Exception as e:
                 print(f"加载字体失败 {font_path}: {e}")
                 # 回退到默认字体
-                default_font_path = os.path.join(
-                    self.base_path, "assets", "fonts", "font3.ttf"
-                )
+                default_font_path = get_resource_path(os.path.join("assets", "fonts", "font3.ttf"))
                 try:
                     self.font_cache[cache_key] = ImageFont.truetype(
                         default_font_path, font_size
@@ -149,23 +146,31 @@ class ImageProcessor:
                     self.font_cache[cache_key] = ImageFont.load_default()
         return self.font_cache[cache_key]
 
-    def _get_available_fonts(self):
-        """获取可用的字体列表"""
-        font_dir = os.path.join(self.base_path, "assets", "fonts")
-        project_fonts = []
-        system_fonts = []
+    # def _get_available_fonts(self):
+    #     """获取可用的字体列表"""
+    #     project_fonts = []
+    #     system_fonts = []
         
-        # 获取项目字体
-        if os.path.exists(font_dir):
-            for file in os.listdir(font_dir):
-                if file.lower().endswith(('.ttf', '.otf', '.ttc')):
-                    project_fonts.append(os.path.join(font_dir, file))
+    #     # 在打包环境中，优先查找程序旁边的assets/fonts文件夹
+    #     # 首先尝试程序目录下的assets/fonts
+    #     base_path = get_base_path()  # 使用get_base_path()而不是__file__
+    #     external_font_dir = os.path.join(base_path, "assets", "fonts")
         
-        # 获取系统字体（作为备选）
-        # 这里可以添加系统字体扫描逻辑，但为了简化，我们只返回项目字体
-        # 实际使用时可以根据需要添加系统字体扫描
+    #     # 如果外部字体目录存在，优先使用
+    #     if os.path.exists(external_font_dir):
+    #         for file in os.listdir(external_font_dir):
+    #             if file.lower().endswith(('.ttf', '.otf', '.ttc')):
+    #                 project_fonts.append(os.path.join(external_font_dir, file))
         
-        return project_fonts, system_fonts
+    #     # 如果外部目录没有找到字体，再尝试资源路径
+    #     if not project_fonts:
+    #         font_dir = get_resource_path(os.path.join("assets", "fonts"))
+    #         if os.path.exists(font_dir):
+    #             for file in os.listdir(font_dir):
+    #                 if file.lower().endswith(('.ttf', '.otf', '.ttc')):
+    #                     project_fonts.append(os.path.join(font_dir, file))
+        
+    #     return project_fonts, system_fonts
 
     def generate_base_image_with_text(
         self, character_name: str, background_index: int, emotion_index: int

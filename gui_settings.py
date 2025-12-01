@@ -6,6 +6,7 @@ import threading
 import os
 import yaml
 import sys
+from path_utils import get_available_fonts
 
 
 class SettingsWindow:
@@ -92,7 +93,7 @@ class SettingsWindow:
         ttk.Label(font_frame, text="对话框字体:").grid(row=0, column=0, sticky=tk.W, pady=5)
         
         # 获取可用字体列表
-        available_fonts = self.get_available_fonts()
+        available_fonts = self._get_available_fonts()
         
         self.font_family_var = tk.StringVar(
             value=self.settings.get("font_family", "Arial")
@@ -583,17 +584,17 @@ class SettingsWindow:
         self.pixel_value_label.config(text=f"{self.pixel_reduction_ratio_var.get()}%")
         self.on_setting_changed()
 
-    def get_available_fonts(self):
+    def _get_available_fonts(self):
         """获取可用字体列表，优先显示项目字体"""
-        fonts_dir = os.path.join(self.core.config.BASE_PATH, "assets", "fonts")
+        font_paths = get_available_fonts()
         project_fonts = []
 
-        # 获取项目字体
-        if os.path.exists(fonts_dir):
-            for file in os.listdir(fonts_dir):
-                if file.lower().endswith(('.ttf', '.otf', '.ttc')):
-                    font_name = os.path.splitext(file)[0]
-                    project_fonts.append(font_name)
+        # 从路径中提取字体文件名（不含扩展名）
+        for font_path in font_paths:
+            if font_path and os.path.exists(font_path):
+                # 获取文件名（不含路径和扩展名）
+                font_name = os.path.splitext(os.path.basename(font_path))[0]
+                project_fonts.append(font_name)
         return project_fonts
 
     def on_setting_changed(self, event=None):

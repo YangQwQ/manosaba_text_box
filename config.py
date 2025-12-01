@@ -1,31 +1,35 @@
 """配置管理模块"""
 import os
 import yaml
+from path_utils import get_base_path, get_resource_path, ensure_path_exists
 
 
 class ConfigLoader:
     """配置加载器"""
     
-    def __init__(self, base_path):
-        self.base_path = base_path
-        self.config_path = os.path.join(base_path, "config")
+    def __init__(self, base_path=None):
+        # 如果没有提供base_path，使用自动检测的路径
+        self.base_path = base_path if base_path else get_base_path()
+        self.config_path = get_resource_path("config")
         self.ai_config = AIConfig()
         
     def load_chara_meta(self):
         """加载角色元数据"""
-        with open(os.path.join(self.config_path, "chara_meta.yml"), 'r', encoding="utf-8") as fp:
+        chara_meta_path = get_resource_path(os.path.join("config", "chara_meta.yml"))
+        with open(chara_meta_path, 'r', encoding="utf-8") as fp:
             config = yaml.safe_load(fp)
             return config["mahoshojo"]
     
     def load_text_configs(self):
         """加载文本配置"""
-        with open(os.path.join(self.config_path, "text_configs.yml"), 'r', encoding="utf-8") as fp:
+        text_configs_path = get_resource_path(os.path.join("config", "text_configs.yml"))
+        with open(text_configs_path, 'r', encoding="utf-8") as fp:
             config = yaml.safe_load(fp)
             return config["text_configs"]
     
     def load_keymap(self, platform):
         """加载快捷键映射 - 确保文件存在时不会重写"""
-        keymap_file = os.path.join(self.config_path, "keymap.yml")
+        keymap_file = get_resource_path(os.path.join("config", "keymap.yml"))
         
         # 如果文件不存在，创建默认配置
         if not os.path.exists(keymap_file):
@@ -82,7 +86,7 @@ class ConfigLoader:
     def _save_keymap(self, keymap_data):
         """保存快捷键配置"""
         try:
-            keymap_file = os.path.join(self.config_path, "keymap.yml")
+            keymap_file = ensure_path_exists(get_resource_path(os.path.join("config", "keymap.yml")))
             # 确保配置目录存在
             os.makedirs(os.path.dirname(keymap_file), exist_ok=True)
             with open(keymap_file, 'w', encoding='utf-8') as f:
@@ -102,7 +106,7 @@ class ConfigLoader:
         else:
             platform_key = 'win32'  # 默认
             
-        whitelist_file = os.path.join(self.config_path, "process_whitelist.yml")
+        whitelist_file = get_resource_path(os.path.join("config", "process_whitelist.yml"))
         
         # 如果文件不存在，返回空列表
         if not os.path.exists(whitelist_file):
@@ -127,7 +131,7 @@ class ConfigLoader:
             else:
                 platform_key = 'win32'  # 默认
                 
-            whitelist_file = os.path.join(self.config_path, "process_whitelist.yml")
+            whitelist_file = ensure_path_exists(get_resource_path(os.path.join("config", "process_whitelist.yml")))
             
             # 如果文件已存在，则先加载现有配置，然后合并
             existing_data = {}
@@ -155,7 +159,7 @@ class ConfigLoader:
         
     def load_gui_settings(self):
         """加载GUI设置"""
-        settings_file = os.path.join(self.config_path, "settings.yml")
+        settings_file = get_resource_path(os.path.join("config", "settings.yml"))
         default_settings = {
             "font_family": "font3",
             "font_size": 110,
@@ -193,7 +197,7 @@ class ConfigLoader:
     def save_gui_settings(self, settings):
         """保存GUI设置到settings.yml"""
         try:
-            settings_file = os.path.join(self.config_path, "settings.yml")
+            settings_file = ensure_path_exists(get_resource_path(os.path.join("config", "settings.yml")))
             
             # 如果文件已存在，则先加载现有配置，然后合并
             if os.path.exists(settings_file):
@@ -234,10 +238,11 @@ class AIConfig:
 class AppConfig:
     """应用配置类"""
     
-    def __init__(self, base_path):
+    def __init__(self, base_path=None):
         self.BOX_RECT = ((728, 355), (2339, 800))  # 文本框区域坐标
         self.KEY_DELAY = 0.1  # 按键延迟
         self.AUTO_PASTE_IMAGE = True
         self.AUTO_SEND_IMAGE = True
-        self.BASE_PATH = base_path
-        self.ASSETS_PATH = os.path.join(base_path, "assets")
+        # 使用自动检测的基础路径
+        self.BASE_PATH = base_path if base_path else get_base_path()
+        self.ASSETS_PATH = get_resource_path("assets")

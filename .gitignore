@@ -3,3 +3,4 @@
 /.vs/
 /emoji_png/
 config/settings.yml
+/build/

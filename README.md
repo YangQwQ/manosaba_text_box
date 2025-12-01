@@ -39,7 +39,7 @@
 <img width="602" height="732" alt="image" src="https://github.com/user-attachments/assets/afb9e178-8772-4a15-bf59-f85f680b1f1c" />
 
 ## 使用须知
-1. 目前已经能用（指直接运行main.py）
+1. 目前已经能用，但是有很多细节部分会在后续优化
 2. 代码是deepseek写的，补药喷我
 3. 有想法随便提，有意思的我会尽力实现
 4. build脚本还不能用（等版本稳定后再修复）
@@ -69,31 +69,36 @@
 - 🔧 高度定制 - 支持自定义角色导入，可配置角色差分和背景是否随机等
 
 ## 使用方法
-1. 下载项目代码
-   ```
-   git clone https://github.com/YangQwQ/Text_box-of-mahoushoujo_no_majosaiban-GUI.git
-   ```
-2. 安装依赖：
-   ```
-   pip install -r requirements.txt
-   ```
-3. 运行程序：
-   ```
-   python main.py
-   ```
-4. 操作说明
+1. 从Release下载运行：
+    1. 下载最新Release版本
+    2. 解压到任意文件夹
+    3. 运行exe文件
+2. 从源码运行：
+    1. 下载项目代码
+      ```
+      git clone https://github.com/YangQwQ/Text_box-of-mahoushoujo_no_majosaiban-GUI.git
+      ```
+    2. 安装依赖：
+      ```
+      pip install -r requirements.txt
+      ```
+    3. 运行程序：
+      ```
+      python main.py
+      ```
+3. 操作说明
    - 切换角色 - 使用选框选择目标角色和表情，也可以使用快捷键，具体请看设置
    - 输入文本 - 在聊天框或文本编辑器中输入想要添加的文本
    - 图片预览 - 在发送前预览图片效果
    - 生成图片 - 按下 `Ctrl+E` 键自动生成并发送
-5. 修改字体及快捷键：
+4. 修改字体及快捷键：
    - 字体文件放置在`<根目录>/assets/fonts`文件夹中，然后打开设置即可修改
    - 快捷键请在`<根目录>/config/keybind.yml`文件中修改
-6. 表情匹配设置：
+5. 表情匹配设置：
    - 表情匹配功能默认关闭，需要在设置中开启
    - 可以下载ollama运行本地模型，也可以使用deepseek的api，需要其它模型的话请自行在setting.yml里面添加
    - 情感分析模型推荐使用ollama，但是可能没有deepseek准确
-7. ollama本地模型配置教程：
+6. ollama本地模型配置教程：
    - 下载并安装ollama
    - 运行ollama，选择一个带得动的模型运行，总之我用的`qwen2.5`
    - 模型下载完毕后，在cmd执行`ollama serve`，程序有开着似乎也行
@@ -104,7 +109,9 @@
 #### 第1步
 请下载需要的角色图片，放置于`<根目录>/assets/chara/<角色名>`文件夹中，
 并统一命名格式为`<角色名> (<差分编号>)`，如图：
+
 <img width="230" height="308" alt="image" src="https://github.com/user-attachments/assets/892b6c8e-b857-482b-94be-07ad240f2a3b" />
+
 > 注意角色名与编号之间的空格
 
 #### 第2步
@@ -159,6 +166,7 @@ warden:
 - 标注了部分角色差分的情感，但是我个木头脑袋感觉出来的不一定准，有没有人能帮帮我（
 - 新增了白名单进程编辑功能，增加了快捷键编辑功能（大概有潜在bug）
 - 把压缩移到合成文字阶段处理，小幅提高了合成速度
+- release已发布
 - 修复了以下bug：
   + 修复了ai匹配的表情不存在时可能会使用固定表情的bug
   + 关闭情感匹配后，预览图能正常根据表情配置正常刷新了
