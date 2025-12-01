@@ -1,7 +1,7 @@
 """AI客户端管理"""
 
+from typing import Dict, Any
 import openai
-from typing import Dict, Any, Optional
 
 class AIClientManager:
     """AI客户端管理器"""

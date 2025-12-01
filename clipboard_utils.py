@@ -1,12 +1,15 @@
 """剪贴板工具模块"""
 
 import io
+import os
 import tempfile
 import subprocess
+from sys import platform
+
 from PIL import Image
 import pyperclip
 import pyclip
-from sys import platform
+
 
 PLATFORM = platform.lower()
 
@@ -29,10 +32,9 @@ class ClipboardManager:
         try:
             if self.platform == "darwin":
                 return self._copy_image_macos(png_bytes)
-            elif self.platform.startswith("win"):
+            if self.platform.startswith("win"):
                 return self._copy_image_windows(png_bytes)
-            else:
-                return self._copy_image_linux(png_bytes)
+            return self._copy_image_linux(png_bytes)
         except Exception as e:
             print(f"复制图片到剪贴板失败: {e}")
             return False
@@ -44,11 +46,11 @@ class ClipboardManager:
             tmp_path = tmp.name
 
         cmd = f"""osascript -e 'set the clipboard to (read (POSIX file "{tmp_path}") as «class PNGf»)'"""
-        result = subprocess.run(cmd, shell=True, capture_output=True)
+        result = subprocess.run(cmd, shell=True, capture_output=True, check=False)
 
         try:
             os.unlink(tmp_path)
-        except:
+        except OSError:
             pass
 
         return result.returncode == 0
@@ -71,7 +73,7 @@ class ClipboardManager:
         finally:
             try:
                 win32clipboard.CloseClipboard()
-            except:
+            except Exception:
                 pass
 
     def _copy_image_linux(self, png_bytes: bytes) -> bool:
@@ -91,10 +93,9 @@ class ClipboardManager:
         """从剪贴板获取图片"""
         if self.platform == "darwin":
             return self._get_image_macos()
-        elif self.platform.startswith("win"):
+        if self.platform.startswith("win"):
             return self._get_image_windows()
-        else:
-            return self._get_image_linux()
+        return self._get_image_linux()
 
     def _get_image_macos(self) -> Image.Image | None:
         """macOS 从剪贴板获取图片"""
@@ -140,7 +141,7 @@ class ClipboardManager:
         finally:
             try:
                 win32clipboard.CloseClipboard()
-            except:
+            except Exception:
                 pass
         return None
 
@@ -152,8 +153,6 @@ class ClipboardManager:
         """检查剪贴板中是否有图片"""
         try:
             if platform.startswith("win"):
-                import win32clipboard
-
                 win32clipboard.OpenClipboard()
                 try:
                     # 尝试获取剪贴板中的图片数据
@@ -162,7 +161,7 @@ class ClipboardManager:
                     return False
                 finally:
                     win32clipboard.CloseClipboard()
-            elif platform == "darwin":
+            if platform == "darwin":
                 # macOS 的实现
                 from AppKit import NSPasteboard, NSPasteboardTypePNG
 
@@ -171,8 +170,7 @@ class ClipboardManager:
                     pasteboard.availableTypeFromArray_([NSPasteboardTypePNG])
                     is not None
                 )
-            else:
-                # Linux 的实现
-                return False  # 需要根据具体实现补充
+            # Linux 的实现
+            return False  # 需要根据具体实现补充
         except Exception:
             return False

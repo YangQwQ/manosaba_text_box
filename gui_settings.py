@@ -19,6 +19,9 @@ class SettingsWindow:
 
         # 加载设置
         self.settings = self.core.get_gui_settings()
+        
+        # 初始化快捷键更改标志
+        self.hotkeys_changed = False
 
         # 获取可用的AI模型配置
         self.ai_models = self.core.get_ai_models()
@@ -428,31 +431,8 @@ class SettingsWindow:
         self.whitelist_text.pack(fill=tk.BOTH, expand=True, pady=5)
 
         # 从配置文件重新加载白名单内容
-        current_whitelist = self.core.config_loader.load_process_whitelist(self.platform)
+        current_whitelist = self.core.config_loader.load_process_whitelist()
         self.whitelist_text.insert('1.0', '\n'.join(current_whitelist))
-
-        # 按钮框架
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Button(button_frame, text="添加进程", command=self.add_whitelist_process).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="删除选中进程", command=self.delete_whitelist_process).pack(side=tk.LEFT, padx=5)
-        
-    def add_whitelist_process(self):
-        """添加进程到白名单"""
-        # 简单实现：在末尾添加新行
-        self.whitelist_text.insert(tk.END, '\n新进程')
-
-    def delete_whitelist_process(self):
-        """删除选中的进程"""
-        try:
-            # 获取选中的文本
-            selected = self.whitelist_text.get(tk.SEL_FIRST, tk.SEL_LAST)
-            # 删除选中文本
-            self.whitelist_text.delete(tk.SEL_FIRST, tk.SEL_LAST)
-        except tk.TclError:
-            # 没有选中文本
-            pass
 
     def setup_model_parameters(self, event=None):
         """设置模型参数显示"""
@@ -656,10 +636,12 @@ class SettingsWindow:
         self.save_hotkey_settings()
         # 保存进程白名单
         self.save_whitelist_settings()
-        # 重新加载配置到core
-        self.core.reload_configs()
-        # 重新初始化热键管理器
-        self.gui.reinitialize_hotkeys()
+        # 只在快捷键有更改时重新初始化热键管理器
+        if self.hotkeys_changed:
+            # 重新加载配置到core
+            self.core.reload_configs()
+            self.gui.reinitialize_hotkeys()
+            self.hotkeys_changed = False  # 重置标志
         # 应用设置时检查是否需要重新初始化AI模型
         self.core._reinitialize_sentiment_analyzer_if_needed()
 
@@ -712,7 +694,7 @@ class SettingsWindow:
         processes = [p.strip() for p in text_content.split('\n') if p.strip()]
 
         # 使用config_loader保存白名单
-        success = self.core.config_loader.save_process_whitelist(self.platform, processes)
+        success = self.core.config_loader.save_process_whitelist(processes)
 
         if success:
             # 更新core中的白名单
@@ -720,13 +702,20 @@ class SettingsWindow:
             return True
         else:
             return False
-        
-    def reload_configs(self):
-        """重新加载配置（用于热键更新后）"""
-        # 重新加载快捷键映射
-        self.keymap = self.config_loader.load_keymap(platform)
-        # 重新加载进程白名单
-        self.process_whitelist = self.config_loader.load_process_whitelist(platform)
-        # 重新加载GUI设置
-        self.gui_settings = self.config_loader.load_gui_settings()
-        self.update_status("配置已重新加载")
+
+    def _check_hotkeys_changed(self):
+        """检查快捷键是否有更改"""
+        # 获取当前快捷键设置
+        current_hotkeys = {}
+        for key in ['start_generate', 'next_character', 'prev_character', 'next_emotion', 'prev_emotion', 
+                   'next_background', 'prev_background', 'toggle_listener']:
+            var_name = f"{key}_hotkey_var"
+            if hasattr(self, var_name):
+                hotkey_var = getattr(self, var_name)
+                current_hotkeys[key] = hotkey_var.get()
+
+        # 获取原始快捷键设置
+        original_hotkeys = self.core.config_loader.load_keymap(self.platform)
+
+        # 比较是否有更改
+        self.hotkeys_changed = current_hotkeys != original_hotkeys

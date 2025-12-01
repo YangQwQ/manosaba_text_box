@@ -10,6 +10,7 @@ from core import ManosabaCore
 from gui_settings import SettingsWindow
 from gui_hotkeys import HotkeyManager
 from gui_components import PreviewManager, StatusManager
+from load_utils import get_preload_status, is_preloading_complete, get_preload_progress
 
 
 class ManosabaGUI:
@@ -44,6 +45,29 @@ class ManosabaGUI:
 
         # 根据初始状态设置按钮可用性
         self.update_sentiment_button_state()
+
+        
+        # 开始预加载状态检查
+        self.check_preload_status()
+
+    def check_preload_status(self):
+        """检查预加载状态并更新界面"""
+        if not is_preloading_complete():
+            progress = get_preload_progress()
+            status = get_preload_status()
+            
+            bg_loaded = status["loaded_backgrounds"]
+            bg_total = status["total_backgrounds"]
+            char_loaded = status["loaded_characters"]
+            char_total = status["total_characters"]
+            
+            self.update_status(f"预加载中... 背景: {bg_loaded}/{bg_total} 角色: {char_loaded}/{char_total} ({progress:.1%})")
+            
+            # 1秒后再次检查
+            self.root.after(1000, self.check_preload_status)
+        else:
+            self.update_status("预加载完成 - 就绪")
+
 
     def reinitialize_hotkeys(self):
         """重新初始化热键管理器"""

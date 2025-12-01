@@ -1,4 +1,9 @@
 """魔裁文本框核心逻辑"""
+from config import ConfigLoader, AppConfig
+from clipboard_utils import ClipboardManager
+from image_processor import ImageProcessor
+from sentiment_analyzer import SentimentAnalyzer
+from load_utils import clear_cache, preload_all_images_async
 
 import os
 import time
@@ -17,12 +22,6 @@ if platform.startswith("win"):
     except ImportError:
         print("[red]请先安装 Windows 运行库: pip install pywin32[/red]")
         raise
-
-from config import ConfigLoader, AppConfig
-from clipboard_utils import ClipboardManager
-from image_processor import ImageProcessor
-from sentiment_analyzer import SentimentAnalyzer
-from load_utils import clear_cache
 
 class ManosabaCore:
     """魔裁文本框核心类"""
@@ -54,14 +53,14 @@ class ManosabaCore:
         self.selected_emotion = None
         self.selected_background = None
         self.last_emotion = -1
-        self.current_character_index = 3
+        self.current_character_index = 2
 
         # 状态更新回调
         self.status_callback = None
 
         # 预览相关
-        self.preview_emotion = None
-        self.preview_background = None
+        # self.preview_emotion = None
+        # self.preview_background = None
 
         # GUI设置
         self.gui_settings = self.config_loader.load_gui_settings()
@@ -73,6 +72,10 @@ class ManosabaCore:
         self.current_ai_config = {}  # 记录当前AI配置
         self.gui_callback = None  # 新增：用于通知GUI状态变化的回调函数
         
+        # 程序启动时开始预加载图片
+        self.update_status("正在预加载图片到缓存...")
+        self._preload_images_async()
+
         # 程序启动时检查是否需要初始化
         sentiment_settings = self.gui_settings.get("sentiment_matching", {})
         if sentiment_settings.get("enabled", False):
@@ -81,6 +84,22 @@ class ManosabaCore:
         else:
             self.update_status("情感匹配功能未启用")
             self._notify_gui_status_change(False, False)
+
+    
+    def _preload_images_async(self):
+        """异步预加载所有图片到缓存"""
+        def preload_callback(success, message):
+            if success:
+                self.update_status("图片预加载完成，所有资源已缓存")
+            else:
+                self.update_status(f"图片预加载失败: {message}")
+        
+        # 开始异步预加载
+        preload_all_images_async(
+            self.config.BASE_PATH,
+            self.mahoshojo,
+            callback=preload_callback
+        )
 
     def set_gui_callback(self, callback):
         """设置GUI回调函数，用于通知状态变化"""
@@ -323,14 +342,14 @@ class ManosabaCore:
         self.character_list = list(self.mahoshojo.keys())
         self.text_configs_dict = self.config_loader.load_text_configs()
         self.keymap = self.config_loader.load_keymap(platform)
-        self.process_whitelist = self.config_loader.load_process_whitelist(platform)
+        self.process_whitelist = self.config_loader.load_process_whitelist()
         
     def reload_configs(self):
         """重新加载配置（用于热键更新后）"""
         # 重新加载快捷键映射
         self.keymap = self.config_loader.load_keymap(platform)
         # 重新加载进程白名单
-        self.process_whitelist = self.config_loader.load_process_whitelist(platform)
+        self.process_whitelist = self.config_loader.load_process_whitelist()
         # 重新加载GUI设置
         self.gui_settings = self.config_loader.load_gui_settings()
         self.update_status("配置已重新加载")
@@ -525,7 +544,7 @@ class ManosabaCore:
 
         # 情感匹配处理：仅当启用且只有文本内容时
         sentiment_settings = self.gui_settings.get("sentiment_matching", {})
-        selected_emotion_by_ai = None
+        # selected_emotion_by_ai = None
 
         if (sentiment_settings.get("enabled", False) and 
             self.sentiment_analyzer_initialized and
@@ -536,7 +555,7 @@ class ManosabaCore:
             emotion_updated = self._update_emotion_by_sentiment(text)
             
             if emotion_updated:
-                selected_emotion_by_ai = self.selected_emotion
+                # selected_emotion_by_ai = self.selected_emotion
                 self.update_status("情感分析完成，更新表情")
                 print(f"[{int((time.time()-start_time)*1000)}] 情感分析完成")
                 # 刷新预览以显示新的表情
@@ -628,9 +647,6 @@ class ManosabaCore:
                 self.kbd_controller.release(Key.enter)
 
                 print(f"[{int((time.time()-start_time)*1000)}] 自动发送完成")
-
-        # 重置最后使用的表情，确保下次随机不会重复
-        # self.last_emotion = -1
         
         # 计算总用时
         end_time = time.time()

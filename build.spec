@@ -38,7 +38,8 @@ core_files = [
     'gui_components.py',
     'gui_hotkeys.py',
     'gui_settings.py',
-    'path_utils.py'
+    'path_utils.py',
+    'load_utils.py'
 ]
 
 for file in core_files:

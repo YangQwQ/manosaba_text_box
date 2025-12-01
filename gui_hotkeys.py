@@ -14,17 +14,22 @@ class HotkeyManager:
         self.core = gui.core
         self.hotkey_listener_active = True
         self.hotkey_thread = None
+        self.last_hotkey_time = {}  # 记录每个热键的最后触发时间
+        self.debounce_delay = 0.5   # 防抖延迟时间（秒）
 
     def setup_hotkeys(self):
         """设置热键监听"""
         self.hotkey_listener_active = True
+        if self.hotkey_thread and self.hotkey_thread.is_alive():
+            return  # 如果线程已经在运行，则不重复启动
         self.hotkey_thread = threading.Thread(target=self.hotkey_listener, daemon=True)
         self.hotkey_thread.start()
 
     def hotkey_listener(self):
         """热键监听线程"""
         try:
-            while self.hotkey_listener_active:
+            while True:  # 改为无限循环，通过hotkey_listener_active控制
+                
                 # 重新加载设置以获取最新配置
                 try:
                     # 获取当前平台的热键
@@ -37,19 +42,24 @@ class HotkeyManager:
                     time.sleep(1)
                     continue
                 
-                # 始终检查停止监听热键
+                # 优先检查停止监听热键，使用更严格的防抖
                 toggle_hotkey = hotkeys.get("toggle_listener", "alt+ctrl+p")
-                if keyboard.is_pressed(toggle_hotkey):
+                if self._is_hotkey_pressed(toggle_hotkey, "toggle_listener"):
                     self.gui.root.after(0, self.toggle_hotkey_listener)
-                    time.sleep(0.5)  # 防止重复触发
-                    
-                # 如果监听未激活，则跳过其他热键检查
-                if not self.hotkey_listener_active:
-                    time.sleep(0.05)
-                    continue
+                    time.sleep(1.0)  # 增加防抖时间，防止冲突
+                    continue  # 处理完toggle后直接继续，避免其他热键干扰
                 
+                # 如果监听未激活，则等待
+                if not self.hotkey_listener_active:
+                    time.sleep(0.1)
+                    continue
+
                 # 检查每个热键
                 for action, hotkey in hotkeys.items():
+                    # 跳过toggle_listener，因为已经单独处理了
+                    if action == "toggle_listener":
+                        continue
+                        
                     # 只监听GUI相关的热键
                     if action in [
                         "start_generate",
@@ -60,7 +70,7 @@ class HotkeyManager:
                         "next_emotion",
                         "prev_emotion",
                     ] or action.startswith("character_"):
-                        if keyboard.is_pressed(hotkey):
+                        if self._is_hotkey_pressed(hotkey, action):
                             # 对于角色快捷键，传递角色ID
                             if action.startswith("character_"):
                                 char_id = quick_chars.get(action, "")
@@ -84,10 +94,52 @@ class HotkeyManager:
             print(f"热键监听错误: {e}")
             time.sleep(1)  # 出错时等待1秒再重试
 
+    def _is_hotkey_pressed(self, hotkey, action_name):
+        """改进的热键检测方法，包含防抖和精确检测"""
+        current_time = time.time()
+        
+        # 检查防抖时间
+        if action_name in self.last_hotkey_time:
+            time_since_last = current_time - self.last_hotkey_time[action_name]
+            if time_since_last < self.debounce_delay:
+                return False
+        
+        # 精确检测热键组合
+        try:
+            # 解析热键组合
+            keys = hotkey.split('+')
+            modifiers = []
+            main_key = None
+            
+            for key in keys:
+                key_lower = key.lower()
+                if key_lower in ['ctrl', 'alt', 'shift', 'win']:
+                    modifiers.append(key_lower)
+                else:
+                    main_key = key_lower
+            
+            # 检查修饰键状态
+            for modifier in modifiers:
+                if not keyboard.is_pressed(modifier):
+                    return False
+            
+            # 检查主键状态
+            if main_key and keyboard.is_pressed(main_key):
+                # 记录触发时间
+                self.last_hotkey_time[action_name] = current_time
+                return True
+                
+        except Exception as e:
+            print(f"热键检测错误 {hotkey}: {e}")
+            
+        return False
+
     def handle_hotkey_action(self, action, char_id=None):
         """处理热键动作"""
         try:
             if action == "start_generate":
+                # 确保所有按键释放后再执行生成操作
+                self._wait_for_keys_release()
                 self.gui.generate_image()  # 生成图片
             elif action == "next_character":
                 self.switch_character(1)  # 向后切换
@@ -108,6 +160,55 @@ class HotkeyManager:
 
         except Exception as e:
             print(f"处理热键动作失败: {e}")
+
+    def _wait_for_keys_release(self, timeout=2.0):
+        """等待所有按键释放"""
+        import time
+        import keyboard
+        
+        start_time = time.time()
+        keys_checked = set()
+        
+        # 检查常见修饰键和字母数字键是否释放
+        common_keys = [
+            'ctrl', 'alt', 'shift', 'win', 
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+            'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+        ]
+        
+        while time.time() - start_time < timeout:
+            all_released = True
+            
+            # 检查常见按键是否都已释放
+            for key in common_keys:
+                if keyboard.is_pressed(key):
+                    all_released = False
+                    if key not in keys_checked:
+                        # print(f"检测到按键 {key} 未释放，等待中...")
+                        keys_checked.add(key)
+                    break
+            
+            if all_released:
+                # print("所有按键已释放，继续执行生成操作")
+                return
+            
+            time.sleep(0.05)  # 短暂等待后再次检查
+        
+        print(f"警告：等待按键释放超时（{timeout}秒），继续执行操作")
+
+    def toggle_hotkey_listener(self):
+        """切换热键监听状态"""
+        self.hotkey_listener_active = not self.hotkey_listener_active
+        status = "启用" if self.hotkey_listener_active else "禁用"
+        self.gui.update_status(f"热键监听已{status}")
+        print(f"热键监听状态已切换为: {status}")  # 添加调试信息
+
+    def update_hotkeys(self):
+        """更新热键设置（供SettingsWindow调用）"""
+        # 热键会在监听线程中自动重新加载，这里只需要确保监听在运行
+        if not self.hotkey_listener_active:
+            self.hotkey_listener_active = True
 
     def switch_emotion(self, direction):
         """切换表情"""
@@ -194,15 +295,3 @@ class HotkeyManager:
                 self.gui.update_status(
                     f"已快速切换到角色: {self.core.get_character(full_name=True)}"
                 )
-
-    def toggle_hotkey_listener(self):
-        """切换热键监听状态"""
-        self.hotkey_listener_active = not self.hotkey_listener_active
-        status = "启用" if self.hotkey_listener_active else "禁用"
-        self.gui.update_status(f"热键监听已{status}")
-
-    def update_hotkeys(self):
-        """更新热键设置（供SettingsWindow调用）"""
-        # 热键会在监听线程中自动重新加载，这里只需要确保监听在运行
-        if not self.hotkey_listener_active:
-            self.hotkey_listener_active = True

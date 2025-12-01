@@ -26,15 +26,6 @@ def get_resource_path(relative_path):
         program_dir_path = os.path.join(base_path, relative_path)
         if os.path.exists(program_dir_path):
             return program_dir_path
-        
-        # 如果程序目录下没有，再尝试临时目录（PyInstaller打包的资源）
-        try:
-            temp_base_path = sys._MEIPASS
-            temp_path = os.path.join(temp_base_path, relative_path)
-            if os.path.exists(temp_path):
-                return temp_path
-        except AttributeError:
-            pass
     
     # 开发环境或打包环境未找到资源时，使用基础路径
     resource_path = os.path.join(base_path, relative_path)

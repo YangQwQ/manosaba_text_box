@@ -1,8 +1,9 @@
 """文件加载工具"""
-from path_utils import get_resource_path
-from PIL import ImageFont, Image
 import os
-# import yaml
+import threading
+from PIL import ImageFont, Image
+
+from path_utils import get_resource_path
 
 # 字体缓存
 _font_cache = {}
@@ -11,6 +12,118 @@ _font_cache = {}
 _background_cache = {}  # 背景图片缓存（长期缓存）
 _character_cache = {}   # 角色图片缓存（可释放）
 _general_image_cache = {}  # 通用图片缓存
+
+# 预加载状态
+_preload_status = {
+    "backgrounds_loaded": False,
+    "characters_loaded": False,
+    "total_backgrounds": 0,
+    "total_characters": 0,
+    "loaded_backgrounds": 0,
+    "loaded_characters": 0
+}
+
+def preload_all_images_async(base_path: str, mahoshojo: dict, callback=None):
+    """异步预加载所有背景和角色图片到缓存"""
+    def preload_task():
+        try:
+            # 预加载背景图片
+            _preload_backgrounds(base_path)
+            
+            # 预加载角色图片
+            _preload_characters(base_path, mahoshojo)
+            
+            # 通知预加载完成
+            if callback:
+                callback(True, "预加载完成")
+        except Exception as e:
+            if callback:
+                callback(False, f"预加载失败: {e}")
+    
+    # 在后台线程中执行预加载
+    preload_thread = threading.Thread(target=preload_task, daemon=True)
+    preload_thread.start()
+
+def _preload_backgrounds(base_path: str):
+    """预加载所有背景图片"""
+    background_dir = os.path.join(base_path, "assets", "background")
+    if not os.path.exists(background_dir):
+        return
+    
+    # 获取所有背景图片文件
+    background_files = [f for f in os.listdir(background_dir) if f.endswith('.png')]
+    _preload_status["total_backgrounds"] = len(background_files)
+    _preload_status["loaded_backgrounds"] = 0
+    
+    for bg_file in background_files:
+        try:
+            bg_path = os.path.join(background_dir, bg_file)
+            # 使用安全加载函数，这会自动缓存图片
+            load_background_safe(bg_path)
+            _preload_status["loaded_backgrounds"] += 1
+        except Exception as e:
+            print(f"预加载背景图片失败 {bg_file}: {e}")
+    
+    _preload_status["backgrounds_loaded"] = True
+
+def _preload_characters(base_path: str, mahoshojo: dict):
+    """预加载所有角色图片"""
+    if not mahoshojo:
+        return
+    
+    chara_dir = os.path.join(base_path, "assets", "chara")
+    if not os.path.exists(chara_dir):
+        return
+    
+    total_characters = 0
+    loaded_characters = 0
+    
+    # 计算总角色图片数量
+    for character_name in mahoshojo.keys():
+        character_dir = os.path.join(chara_dir, character_name)
+        if os.path.exists(character_dir):
+            emotion_count = mahoshojo[character_name].get("emotion_count", 0)
+            total_characters += emotion_count
+    
+    _preload_status["total_characters"] = total_characters
+    _preload_status["loaded_characters"] = 0
+    
+    # 预加载每个角色的每个表情图片
+    for character_name in mahoshojo.keys():
+        character_dir = os.path.join(chara_dir, character_name)
+        if not os.path.exists(character_dir):
+            continue
+            
+        emotion_count = mahoshojo[character_name].get("emotion_count", 0)
+        for emotion_index in range(1, emotion_count + 1):
+            try:
+                chara_path = os.path.join(character_dir, f"{character_name} ({emotion_index}).png")
+                # 使用安全加载函数，这会自动缓存图片
+                load_character_safe(chara_path)
+                _preload_status["loaded_characters"] += 1
+            except Exception as e:
+                print(f"预加载角色图片失败 {character_name} 表情{emotion_index}: {e}")
+    
+    _preload_status["characters_loaded"] = True
+
+def get_preload_status():
+    """获取预加载状态"""
+    return _preload_status.copy()
+
+def is_preloading_complete():
+    """检查预加载是否完成"""
+    return _preload_status["backgrounds_loaded"] and _preload_status["characters_loaded"]
+
+def get_preload_progress():
+    """获取预加载进度"""
+    total_items = _preload_status["total_backgrounds"] + _preload_status["total_characters"]
+    loaded_items = _preload_status["loaded_backgrounds"] + _preload_status["loaded_characters"]
+    
+    if total_items == 0:
+        return 0.0
+    
+    return loaded_items / total_items
+
 
 #缓存字体
 def load_font_cached(font_path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -110,11 +223,11 @@ def clear_cache(cache_type: str = "all"):
     """清理特定类型的缓存"""
     global _font_cache, _background_cache, _character_cache, _general_image_cache
     
-    if cache_type == "font" or cache_type == "all":
+    if cache_type in ("font", "all"):
         _font_cache.clear()
-    if cache_type == "background" or cache_type == "all":
+    if cache_type in ("background", "all"):
         _background_cache.clear()
-    if cache_type == "character" or cache_type == "all":
+    if cache_type in ("character", "all"):
         _character_cache.clear()
-    if cache_type == "image" or cache_type == "all":
+    if cache_type in ("image", "all"):
         _general_image_cache.clear()

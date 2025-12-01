@@ -35,8 +35,6 @@ def draw_text_auto(
     valign: VAlign = "middle",
     line_spacing: float = 0.15,#行距
     bracket_color: Tuple[int, int, int] = (137,177,251),  # 中括号及内部内容颜色
-    # image_overlay: Union[str, Image.Image,None]=None,
-    # overlay_offset: Tuple[int, int] = (0, 0),
     compression_settings: dict = None
 ) -> bytes:
     """
@@ -52,12 +50,6 @@ def draw_text_auto(
     #延迟创建pilmoji，先创建普通draw
     pilmoji = None
     temp_draw = ImageDraw.Draw(img)
-
-    # if image_overlay is not None:
-    #     if isinstance(image_overlay, Image.Image):
-    #         img_overlay = image_overlay.copy()
-    #     else:
-    #         img_overlay = Image.open(image_overlay).convert("RGBA") if os.path.isfile(image_overlay) else None
 
     x1, y1 = top_left
     x2, y2 = bottom_right
@@ -82,7 +74,8 @@ def draw_text_auto(
     #文本分行
     def wrap_lines(txt: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
         lines: list[str] = []
-        
+        has_space=False
+
         for para in txt.splitlines() or [""]:
             has_space = (" " in para)
             units = para.split(" ") if has_space else list(para)
@@ -178,13 +171,13 @@ def draw_text_auto(
         segs: list[tuple[str, Tuple[int, int, int]]] = []
         buf = ""
         for ch in s:
-            if ch == "[" or ch == "【":
+            if ch in ("[", "【"):
                 if buf:
                     segs.append((buf, bracket_color if in_bracket else color))
                     buf = ""
                 segs.append((ch, bracket_color))
                 in_bracket = True
-            elif ch == "]" or ch == "】":
+            elif ch in ("]", "】"):
                 if buf:
                     segs.append((buf, bracket_color))
                     buf = ""
@@ -207,8 +200,6 @@ def draw_text_auto(
     # --- 8. 绘制---
     y = y_start
     in_bracket = False
-    # 延迟创建pilmoji：只在需要绘制emoji段时创建一次
-    # pilmoji_created = False
 
     for ln in best_lines:
         #计算行宽
@@ -228,10 +219,6 @@ def draw_text_auto(
                 continue
             seg_has_emoji = any(is_emoji_unicode(ch) for ch in seg_text)
             if seg_has_emoji:
-                # if not pilmoji_created:
-                #     pilmoji = Pilmoji(img)
-                #     pilmoji_created = True
-                # pilmoji.text((x+4, y+4), seg_text, font=font, fill=(0,0,0), emoji_position_offset=(0, 20))
                 pilmoji.text((x, y), seg_text, font=font, fill=seg_color, emoji_position_offset=(0, 20))
                 adv = pilmoji.getsize(seg_text, font=font)[0]
             else:
@@ -245,12 +232,6 @@ def draw_text_auto(
         y += best_line_h
         if y - y_start > region_h:
             break
-
-    #覆盖置顶图层
-    # if image_overlay is not None and img_overlay is not None:
-    #     img.paste(img_overlay, overlay_offset, img_overlay)
-    # elif image_overlay is not None:
-    #     print("Warning: overlay image is not exist.")
 
     # 压缩图片
     img = compress_image(img,compression_settings)

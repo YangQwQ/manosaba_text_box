@@ -1,5 +1,6 @@
 """配置管理模块"""
 import os
+from sys import platform
 import yaml
 from path_utils import get_base_path, get_resource_path, ensure_path_exists
 
@@ -12,6 +13,14 @@ class ConfigLoader:
         self.base_path = base_path if base_path else get_base_path()
         self.config_path = get_resource_path("config")
         self.ai_config = AIConfig()
+
+        # 规范化平台键
+        if platform.startswith('win'):
+            self.platform_key = 'win32'
+        elif platform == 'darwin':
+            self.platform_key = 'darwin'
+        else:
+            self.platform_key = 'win32'
         
     def load_chara_meta(self):
         """加载角色元数据"""
@@ -96,15 +105,15 @@ class ConfigLoader:
             print(f"保存keymap.yml失败: {e}")
             return False
     
-    def load_process_whitelist(self, platform):
+    def load_process_whitelist(self):
         """加载进程白名单"""
-        # 规范化平台键
-        if platform.startswith('win'):
-            platform_key = 'win32'
-        elif platform == 'darwin':
-            platform_key = 'darwin'
-        else:
-            platform_key = 'win32'  # 默认
+        # # 规范化平台键
+        # if platform.startswith('win'):
+        #     platform_key = 'win32'
+        # elif platform == 'darwin':
+        #     platform_key = 'darwin'
+        # else:
+        #     platform_key = 'win32'  # 默认
             
         whitelist_file = get_resource_path(os.path.join("config", "process_whitelist.yml"))
         
@@ -115,21 +124,21 @@ class ConfigLoader:
         try:
             with open(whitelist_file, 'r', encoding="utf-8") as fp:
                 config = yaml.safe_load(fp) or {}
-                return config.get(platform_key, [])
+                return config.get(self.platform_key, [])
         except Exception as e:
             print(f"加载process_whitelist.yml失败: {e}")
             return []
     
-    def save_process_whitelist(self, platform, processes):
+    def save_process_whitelist(self, processes):
         """保存进程白名单"""
         try:
-            # 规范化平台键
-            if platform.startswith('win'):
-                platform_key = 'win32'
-            elif platform == 'darwin':
-                platform_key = 'darwin'
-            else:
-                platform_key = 'win32'  # 默认
+            # # 规范化平台键
+            # if platform.startswith('win'):
+            #     platform_key = 'win32'
+            # elif platform == 'darwin':
+            #     platform_key = 'darwin'
+            # else:
+            #     platform_key = 'win32'
                 
             whitelist_file = ensure_path_exists(get_resource_path(os.path.join("config", "process_whitelist.yml")))
             
@@ -143,7 +152,7 @@ class ConfigLoader:
                     print(f"读取现有白名单配置失败: {e}")
             
             # 更新当前平台的白名单
-            existing_data[platform_key] = processes
+            existing_data[self.platform_key] = processes
             
             # 确保配置目录存在
             os.makedirs(os.path.dirname(whitelist_file), exist_ok=True)

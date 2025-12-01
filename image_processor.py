@@ -139,7 +139,6 @@ class ImageProcessor:
             # 调用粘贴图像函数，它返回的是字节数据
             result = paste_image_auto(
                 image_source=base_image,
-                # image_overlay=None,
                 top_left=text_box_topleft,
                 bottom_right=image_box_bottomright,
                 content_image=content_image,
@@ -148,10 +147,6 @@ class ImageProcessor:
                 padding=12,
                 allow_upscale=True,
                 keep_alpha=True,
-                # role_name=character_name,
-                # text_configs_dict=self.text_configs_dict,
-                # base_path=self.base_path,
-                # overlay_offset=(0, 134),
             )
             base_image=result
         if text is not None and text != "":
@@ -161,7 +156,6 @@ class ImageProcessor:
             # 调用绘制文本函数，它返回的是字节数据
             result = draw_text_auto(
                 image_source=base_image,
-                # image_overlay=None,
                 top_left=text_box_topleft,
                 bottom_right=image_box_bottomright,
                 text=text,
@@ -170,7 +164,6 @@ class ImageProcessor:
                 color=(255, 255, 255),
                 max_font_height=max_font_height,
                 font_path=font_path,
-                # overlay_offset=(0, 134),
                 compression_settings=compression_settings
             )
         return result
