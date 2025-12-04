@@ -1,9 +1,72 @@
-import openai
-import time
-import re
 from typing import Optional, Dict, Any
-from ai_client import AIClientManager  # 新增导入
+import re
 
+import openai
+from config import ConfigLoader
+
+
+class AIClientManager:
+    """AI客户端管理器"""
+    
+    def __init__(self):
+        self.clients = {}
+        self.current_client = None
+        self.config_loader = ConfigLoader()
+        
+    def initialize_client(self, client_type: str, config: Dict[str, Any]) -> bool:
+        """初始化AI客户端"""
+        try:
+            openai.api_key = config.get("api_key", "")
+            openai.base_url = config.get("base_url", "http://localhost:11434/v1/")
+            self.current_client = client_type
+
+            return self._test_connection(config.get("model", ""))
+            
+        except Exception as e:
+            print(f"初始化AI客户端失败: {e}")
+            return False
+    
+    def _test_connection(self, model_name: str) -> bool:
+        """测试连接"""
+        try:
+            # 发送一个简单的测试请求
+            response = openai.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": "Hello"}],
+                max_tokens=5
+            )
+            return response.choices[0].message.content is not None
+        except Exception as e:
+            print(f"连接测试失败: {e}")
+            return False
+    
+    def _load_config_from_file(self) -> Dict[str, Any]:
+        """从配置文件加载配置"""
+        config_path = get_resource_path(os.path.join("config", "settings.yml"))
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+                return config or {}
+        except Exception as e:
+            print(f"加载配置文件失败: {e}")
+            return {}
+    
+    def _save_config_to_file(self, config: Dict[str, Any]) -> bool:
+        """保存配置到文件"""
+        config_path = get_resource_path(os.path.join("config", "settings.yml"))
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(config, f, default_flow_style=False, allow_unicode=True, indent=2)
+            return True
+        except Exception as e:
+            print(f"保存配置文件失败: {e}")
+            return False
+    
+    def get_available_models(self) -> Dict[str, Dict[str, Any]]:
+        """获取可用模型配置"""
+        # 使用ConfigLoader获取模型配置
+        return self.config_loader.get_available_models()
+    
 class SentimentAnalyzer:
     def __init__(self):
         self.client_manager = AIClientManager()  # 使用客户端管理器
@@ -86,39 +149,8 @@ class SentimentAnalyzer:
         # 清理回复文本
         cleaned_response = re.sub(r'[^\w\u4e00-\u9fff]', '', response)
         
-        # 直接匹配情感词汇
-        for emotion in self.emotion_list:
-            if emotion in cleaned_response:
-                return emotion
+        return cleaned_response if cleaned_response in self.emotion_list else None
         
-        return None
-    
-    def send_rule_and_detect(self) -> bool:
-        """
-        规则发送与检测函数
-        """
-        if not self.client_manager.current_client:
-            print("未设置AI客户端，请先调用initialize函数")
-            return False
-            
-        try:
-            response = self._send_request("请确认你理解规则")
-            success = self._check_initialization_response(response)
-            
-            if success:
-                self.is_initialized = True
-                print("规则发送成功，AI已确认")
-            else:
-                self.is_initialized = False
-                print(f"规则发送失败，AI回复: {response}")
-                
-            return success
-            
-        except Exception as e:
-            print(f"规则发送失败: {e}")
-            self.is_initialized = False
-            return False
-    
     def switch_api(self, new_client_type: str, config: Dict[str, Any]) -> bool:
         """
         切换AI客户端
@@ -140,7 +172,7 @@ class SentimentAnalyzer:
             print(f"切换过程中发生错误: {e}")
             return False
     
-    def analyze_sentiment(self, text: str, max_retries: int = 2) -> Optional[str]:
+    def analyze_sentiment(self, text: str) -> Optional[str]:
         """
         情感检测函数
         """
@@ -154,25 +186,12 @@ class SentimentAnalyzer:
             
             # 提取情感
             self.selected_emotion = self._extract_emotion(response)
-            
-            if self.selected_emotion:
-                return self.selected_emotion
-            
-            return None
+            return self.selected_emotion if self.selected_emotion else None
                 
         except Exception as e:
             print(f"情感分析请求失败: {e}")
             return None
 
-    # def get_status(self) -> Dict[str, Any]:
-    #     """
-    #     获取分析器状态
-    #     """
-    #     return {
-    #         "current_client": self.client_manager.current_client,
-    #         "is_initialized": self.is_initialized,
-    #         "emotion_list": self.emotion_list
-    #     }
     
 # # 使用示例
 # def main():

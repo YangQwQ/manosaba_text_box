@@ -30,16 +30,13 @@ core_files = [
     'gui.py', 
     'config.py',
     'clipboard_utils.py',
-    'image_processor.py',
-    'text_fit_draw.py',
-    'image_fit_paste.py',
-    'ai_client.py',
     'sentiment_analyzer.py',
     'gui_components.py',
     'gui_hotkeys.py',
     'gui_settings.py',
     'path_utils.py',
-    'load_utils.py'
+    'load_utils.py',
+    'draw_utils.py'
 ]
 
 for file in core_files:
@@ -71,20 +68,10 @@ hiddenimports = [
     
     # 网络请求
     'openai',
-    'requests',
-    'requests.utils',
-    'requests.auth',
-    'requests.models',
-    'certifi',
-    'charset_normalizer',
-    'idna',
-    'urllib3',
-    'urllib3.util',
-    'urllib3.contrib',
     
     # Windows API
     'win32clipboard',
-    # 'win32gui',
+    'win32gui',
     'win32process',
     'win32api',
     'win32con',
@@ -98,10 +85,17 @@ hiddenimports = [
     # 系统工具
     'psutil',
     
-    # 剪贴板
-    'pyperclip',
-    'pyclip',
-    
+    # PIL 图像处理
+    'PIL._tkinter_finder',
+    'PIL._imaging',
+    'PIL.Image',
+    'PIL.ImageTk',
+    'PIL.ImageOps',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'PIL.PngImagePlugin',  # 添加 PNG 支持
+    'PIL.JpegImagePlugin'
+
     # 其他必要模块
     'yaml'
 ]

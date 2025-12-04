@@ -1,10 +1,10 @@
 """魔裁文本框核心逻辑"""
 from config import ConfigLoader, AppConfig
 from clipboard_utils import ClipboardManager
-from image_processor import ImageProcessor
 from sentiment_analyzer import SentimentAnalyzer
-from load_utils import clear_cache, preload_all_images_async
-from path_utils import get_available_fonts
+from load_utils import clear_cache, preload_all_images_async, load_background_safe, load_character_safe
+from path_utils import get_resource_path, get_available_fonts
+from draw_utils import draw_content_auto, load_font_cached
 
 import os
 import time
@@ -14,6 +14,7 @@ import threading
 from pynput.keyboard import Key, Controller
 from sys import platform
 import keyboard as kb_module
+from PIL import Image, ImageDraw
 from typing import Dict, Any
 
 if platform.startswith("win"):
@@ -40,27 +41,28 @@ class ManosabaCore:
         self.character_list = []
         self.keymap = {}
         self.process_whitelist = []
-        self.load_configs()
+        self._load_configs()
 
-        # 初始化图片处理器
-        self.image_processor = ImageProcessor(
-            self.config.BASE_PATH,
-            self.config.BOX_RECT,
-            self.text_configs_dict,
-            self.mahoshojo,  # 传递角色元数据用于字体获取
-        )
-
-        # 状态变量
+        # 图片处理器相关的属性
+        self.box_rect = self.config.BOX_RECT
+        self.background_count = self._get_background_count()  # 背景图片数量
+        
+        # 状态变量(为None时为随机选择)
         self.selected_emotion = None
         self.selected_background = None
-        self.last_emotion = -1
+        
+        #预览图当前的索引
+        self.preview_emotion = -1
+        self.preview_background = -1
+        self.current_base_image = None  # 当前预览的基础图片（用于快速生成）
         self.current_character_index = 2
-
+        
         # 状态更新回调
         self.status_callback = None
+        self.gui_callback = None
 
         # GUI设置
-        self.gui_settings = self.config_loader.load_gui_settings()
+        self.gui_settings = self.config_loader.load_config("gui_settings")
 
         # 初始化情感分析器 - 不在这里初始化，等待特定时机
         self.sentiment_analyzer = SentimentAnalyzer()
@@ -69,7 +71,6 @@ class ManosabaCore:
             'initializing': False,
             'current_config': {}
         }
-        self.gui_callback = None  # 新增：用于通知GUI状态变化的回调函数
         
         # 程序启动时开始预加载图片
         self.update_status("正在预加载图片到缓存...")
@@ -84,6 +85,82 @@ class ManosabaCore:
             self.update_status("情感匹配功能未启用")
             self._notify_gui_status_change(False, False)
 
+    def _get_background_count(self) -> int:
+        """动态获取背景图片数量"""
+        try:
+            background_dir = get_resource_path(os.path.join("assets", "background"))
+            if os.path.exists(background_dir):
+                # 统计所有c开头的背景图片
+                bg_files = [f for f in os.listdir(background_dir) 
+                           if f.endswith('.png') and f.lower().startswith('c')]
+                return len(bg_files)
+            else:
+                print(f"警告：背景图片目录不存在: {background_dir}")
+                return 0
+        except Exception as e:
+            print(f"获取背景数量失败: {e}")
+            return 0
+
+    def _preload_character_images(self, character_name: str):
+        """预加载角色图片到内存"""
+        if character_name not in self.mahoshojo:
+            return
+
+        emotion_count = self.mahoshojo[character_name].get("emotion_count", 0)
+
+        for emotion_index in range(1, emotion_count + 1):
+            overlay_path = get_resource_path(os.path.join(
+                "assets",
+                "chara",
+                character_name,
+                f"{character_name} ({emotion_index}).png"
+            ))
+            load_character_safe(overlay_path)
+
+    def _generate_base_image_with_text(
+        self, character_name: str, background_index: int, emotion_index: int
+    ) -> Image.Image:
+        """生成带角色文字的基础图片"""
+        background_path = get_resource_path(os.path.join("assets", "background", f"c{background_index}.png"))
+        background = load_background_safe(background_path, default_size=(800, 600), default_color=(100, 100, 200))
+        
+        overlay_path = get_resource_path(os.path.join(
+            "assets",
+            "chara",
+            character_name,
+            f"{character_name} ({emotion_index}).png"
+        ))
+        overlay = load_character_safe(overlay_path, default_size=(800, 600), default_color=(0, 0, 0, 0))
+
+        result = background
+        result.paste(overlay, (0, 134), overlay)
+
+        # 添加角色名称文字
+        if self.text_configs_dict and character_name in self.text_configs_dict:
+            draw = ImageDraw.Draw(result)
+            shadow_offset = (2, 2)
+            shadow_color = (0, 0, 0)
+
+            for config in self.text_configs_dict[character_name]:
+                text = config["text"]
+                position = tuple(config["position"])
+                font_color = tuple(config["font_color"])
+                font_size = config["font_size"]
+
+                font_name = self.mahoshojo[character_name].get("font", "font3.ttf")
+                font = load_font_cached(font_name, font_size)
+
+                # 绘制阴影文字
+                shadow_position = (
+                    position[0] + shadow_offset[0],
+                    position[1] + shadow_offset[1],
+                )
+                draw.text(shadow_position, text, fill=shadow_color, font=font)
+
+                # 绘制主文字
+                draw.text(position, text, fill=font_color, font=font)
+
+        return result
     
     def _preload_images_async(self):
         """异步预加载所有图片到缓存"""
@@ -313,22 +390,22 @@ class ManosabaCore:
             return True
         return False
 
-    def load_configs(self):
+    def _load_configs(self):
         """加载所有配置"""
-        self.mahoshojo = self.config_loader.load_chara_meta()
+        self.mahoshojo = self.config_loader.load_config("chara_meta")
         self.character_list = list(self.mahoshojo.keys())
-        self.text_configs_dict = self.config_loader.load_text_configs()
-        self.keymap = self.config_loader.load_keymap(platform)
-        self.process_whitelist = self.config_loader.load_process_whitelist()
+        self.text_configs_dict = self.config_loader.load_config("text_configs")
+        self.keymap = self.config_loader.load_config("keymap")
+        self.process_whitelist = self.config_loader.load_config("process_whitelist")
         
     def reload_configs(self):
         """重新加载配置（用于热键更新后）"""
         # 重新加载快捷键映射
-        self.keymap = self.config_loader.load_keymap(platform)
+        self.keymap = self.config_loader.load_config("keymap", platform=platform)
         # 重新加载进程白名单
-        self.process_whitelist = self.config_loader.load_process_whitelist()
+        self.process_whitelist = self.config_loader.load_config("process_whitelist")
         # 重新加载GUI设置
-        self.gui_settings = self.config_loader.load_gui_settings()
+        self.gui_settings = self.config_loader.load_config("gui_settings")
         self.update_status("配置已重新加载")
 
     def get_character(self, index: str | None = None, full_name: bool = False) -> str:
@@ -346,25 +423,13 @@ class ManosabaCore:
             self.current_character_index = index
             character_name = self.get_character()
             # 预加载角色图片到内存
-            self.image_processor.preload_character_images(character_name)
+            self._preload_character_images(character_name)
             return True
         return False
-
-    def get_current_font(self) -> str:
-        """返回当前角色的字体名称"""
-        return self.image_processor.get_character_font(self.get_character())
 
     def get_current_emotion_count(self) -> int:
         """获取当前角色的表情数量"""
         return self.mahoshojo[self.get_character()]["emotion_count"]
-
-    def get_character_list(self):
-        """获取角色列表"""
-        return self.character_list
-
-    def get_character_name(self, index=None, full_name=False):
-        """获取角色名称（兼容性方法）"""
-        return self.get_character(index, full_name)
 
     def get_gui_settings(self):
         """获取GUI设置"""
@@ -375,23 +440,20 @@ class ManosabaCore:
         self.gui_settings = settings
         return self.config_loader.save_gui_settings(settings)
 
-    def _get_random_emotion(self, emotion_count: int) -> int:
+    def _get_random_index(self, index_count: int, exclude_index: int = -1) -> int:
         """随机选择表情（避免连续相同）"""
-        if self.last_emotion == -1:
-            emotion_index = random.randint(1, emotion_count)
+        if exclude_index == -1:
+            final_index = random.randint(1, index_count)
         else:
             # 避免连续相同表情
-            available_emotions = [
-                i for i in range(1, emotion_count + 1) if i != self.last_emotion
-            ]
-            emotion_index = (
-                random.choice(available_emotions)
-                if available_emotions
-                else self.last_emotion
+            available_indices = [i for i in range(1, index_count + 1) if i != exclude_index]
+            final_index = (
+                random.choice(available_indices)
+                if available_indices
+                else exclude_index
             )
 
-        self.last_emotion = emotion_index
-        return emotion_index
+        return final_index
 
     def _active_process_allowed(self) -> bool:
         """校验当前前台进程是否在白名单"""
@@ -433,34 +495,22 @@ class ManosabaCore:
         else:
             # Linux 支持
             return True
+    
+    def set_status_callback(self, callback):
+        """设置状态更新回调函数"""
+        self.status_callback = callback
 
-    def cut_all_and_get_text(self) -> str:
-        """模拟全选和剪切操作，返回剪切得到的文本内容"""
-        self.clipboard_manager.copy_text_to_clipboard("")
+    def update_status(self, message: str):
+        """更新状态（供外部调用）"""
+        if self.status_callback:
+            self.status_callback(message)
 
-        if platform == "darwin":
-            self.kbd_controller.press(Key.cmd)
-            self.kbd_controller.press("a")
-            self.kbd_controller.release("a")
-            self.kbd_controller.press("x")
-            self.kbd_controller.release("x")
-            self.kbd_controller.release(Key.cmd)
-        elif platform.startswith("win"):
-            kb_module.send("CTRL+A")
-            kb_module.send("CTRL+X")
-
-        # 增加重试机制来确保剪贴板中有内容
-        new_clip = ""
-        max_retries = 3
-        for attempt in range(max_retries):
-            time.sleep(self.config.KEY_DELAY)
-            new_clip = self.clipboard_manager.get_text_from_clipboard()
-            if new_clip.strip():
-                break
-            elif attempt < max_retries - 1:
-                time.sleep(self.config.KEY_DELAY * (attempt + 1))
-
-        return new_clip.strip()
+    def _hex_to_rgb(self, hex_color: str) -> tuple:
+        """将十六进制颜色转换为RGB元组"""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 3:
+            hex_color = ''.join([c*2 for c in hex_color])
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     def generate_preview(self) -> tuple:
         """生成预览图片和相关信息"""
@@ -469,12 +519,12 @@ class ManosabaCore:
 
         # 确定表情和背景
         emotion_index = (
-            self._get_random_emotion(emotion_count)
+            self._get_random_index(emotion_count, exclude_index=self.preview_emotion)
             if self.selected_emotion is None
             else self.selected_emotion
         )
         background_index = (
-            self.image_processor.get_random_background()
+            self._get_random_index(self.background_count, exclude_index=self.preview_background)
             if self.selected_background is None
             else self.selected_background
         )
@@ -484,9 +534,15 @@ class ManosabaCore:
         self.preview_background = background_index
 
         # 生成预览图片
-        preview_image = self.image_processor.generate_preview_image(
-            character_name, background_index, emotion_index
-        )
+        try:
+            self.current_base_image = self._generate_base_image_with_text(
+                character_name, background_index, emotion_index
+            )
+        except:
+            self.current_base_image = Image.new("RGB", (400, 300), color="gray")
+
+        # 用于 GUI 预览
+        preview_image = self.current_base_image.copy()
 
         # 构建预览信息 - 显示实际使用的索引值
         emotion_text = (
@@ -507,26 +563,44 @@ class ManosabaCore:
         if not self._active_process_allowed():
             return "前台应用不在白名单内"
 
-        character_name = self.get_character()
         base_msg=""
 
         # 开始计时
         start_time = time.time()
         print(f"[{int((time.time()-start_time)*1000)}] 开始生成图片")
 
-        # 获取剪切板内容
-        text = self.cut_all_and_get_text()
-        image = self.clipboard_manager.get_image_from_clipboard()
-        print(f"[{int((time.time()-start_time)*1000)}] 剪切板内容获取完成")
+        # 清空剪贴板
+        self.clipboard_manager.clear_clipboard()
 
+        time.sleep(0.005)
+
+        if platform.startswith("win"):
+            kb_module.send("ctrl+a")
+            kb_module.send("ctrl+x")
+        else:
+            self.kbd_controller.press(Key.cmd)
+            self.kbd_controller.press("a")
+            self.kbd_controller.release("a")
+            self.kbd_controller.press("x")
+            self.kbd_controller.release("x")
+            self.kbd_controller.release(Key.cmd)
+
+        print(f"[{int((time.time()-start_time)*1000)}] 开始读取剪切板")
+        deadline = time.time() + 2.5
+        while time.time() < deadline:
+            text, image = self.clipboard_manager.get_clipboard_all()
+            if (text and text.strip()) or image is not None:
+                print(f"[{int((time.time()-start_time)*1000)}] 剪切板内容获取完成")
+                break
+            time.sleep(0.005)
+            
+        print("读取到图片" if image is not None else "", "读取到文本" if text.strip() else "")
         # 情感匹配处理：仅当启用且只有文本内容时
         sentiment_settings = self.gui_settings.get("sentiment_matching", {})
-        # selected_emotion_by_ai = None
 
         if (sentiment_settings.get("enabled", False) and 
             self.sentiment_analyzer_status['initialized'] and
-            text.strip() and 
-            image is None):
+            text.strip()):
             
             self.update_status("正在分析文本情感...")
             emotion_updated = self._update_emotion_by_sentiment(text)
@@ -548,54 +622,43 @@ class ManosabaCore:
 
         try:
             # 使用GUI中设置的对话框字体，而不是角色专用字体
-            font_file = None
-            font_name=None
             font_family = self.gui_settings.get("font_family")
-            font_size = self.gui_settings.get("font_size", 120)
 
-           # 如果设置了字体家族，检测是否在可用字体列表中
-            if font_family:
-                # 获取可用字体列表（去掉后缀名的字体名称）
-                font_files = get_available_fonts()
-                for font_file in font_files:
-                    if font_file and font_family == os.path.splitext(os.path.basename(font_file))[0]:
-                        # 检查设置的字体家族是否在可用字体列表中
-                        font_name = font_file
-                        break
-            #字体回退
-            if font_name is None:
+            # 查找匹配的字体文件
+            font_name = next(
+                (font_file for font_file in get_available_fonts()
+                if font_file and font_family == os.path.splitext(os.path.basename(font_file))[0]),
+                None
+            )
+
+            if not font_name:
                 print(f"字体家族 {font_family} 不在可用字体列表中")
-                font_name = self.get_current_font()  # 使用角色专用字体名称
-
-            # 获取文字颜色设置
-            text_color_hex = self.gui_settings.get("text_color", "#FFFFFF")
-            # 将十六进制颜色转换为RGB元组
-            text_color = self.hex_to_rgb(text_color_hex)
-
-            # 获取强调颜色设置
-            bracket_color_hex = self.gui_settings.get("bracket_color", "#89B1FB")
-            # 将十六进制颜色转换为RGB元组
-            bracket_color = self.hex_to_rgb(bracket_color_hex)
+                font_name = self.mahoshojo[self.get_character()].get("font", "font3.ttf")
 
             # 生成图片
-            bmp_bytes = self.image_processor.generate_image_fast(
-                character_name,
-                text,
-                image,
-                font_name,  # 传递字体名称而非路径
-                font_size,
-                text_color,
-                bracket_color,
-                self.gui_settings.get("image_compression", {})
+            print(f"[{int((time.time()-start_time)*1000)}] 开始合成图片")
+            bmp_bytes = draw_content_auto(
+                image_source=self.current_base_image,
+                top_left=self.config.BOX_RECT[0],
+                bottom_right=self.config.BOX_RECT[1],
+                text=text,
+                content_image=image,
+                text_align="left",
+                text_valign="top",
+                image_align="center",
+                image_valign="middle",
+                color=self._hex_to_rgb(self.gui_settings.get("text_color", "#FFFFFF")),
+                bracket_color=self._hex_to_rgb(self.gui_settings.get("bracket_color", "#89B1FB")),
+                max_font_height=self.gui_settings.get("font_size", 120),
+                font_name=font_name,
+                image_padding=12,
+                compression_settings=self.gui_settings.get("image_compression", None),
             )
 
             print(f"[{int((time.time()-start_time)*1000)}] 图片合成完成")
 
         except Exception as e:
             return f"生成图像失败: {e}"
-
-        if bmp_bytes is None:
-            return "生成图像失败！"
 
         # 复制到剪贴板
         if not self.clipboard_manager.copy_image_to_clipboard(bmp_bytes):
@@ -604,16 +667,14 @@ class ManosabaCore:
         print(f"[{int((time.time()-start_time)*1000)}] 图片复制到剪切板完成")
 
         # 等待剪贴板确认（最多等待2.5秒）
-        max_wait_time = 2.5
-        wait_interval = 0.05
-
-        while max_wait_time > 0:
-            # 检查剪贴板中是否有图片
+        wait = 0.01
+        total = 0
+        while total < 0.5:
             if self.clipboard_manager.has_image_in_clipboard():
                 break
-            time.sleep(wait_interval)
-            max_wait_time -= wait_interval
-
+            time.sleep(wait)
+            total += wait
+            wait = min(wait * 1.5, 0.08)
         print(f"[{int((time.time()-start_time)*1000)}] 剪切板确认完成")
 
         # 自动粘贴和发送
@@ -623,35 +684,16 @@ class ManosabaCore:
             self.kbd_controller.release("v")
             self.kbd_controller.release(Key.ctrl if platform != "darwin" else Key.cmd)
 
-            time.sleep(0.1)
-
+            time.sleep(0.05)
+            if not self._active_process_allowed():
+                return "前台应用不在白名单内"
             if self.config.AUTO_SEND_IMAGE:
                 self.kbd_controller.press(Key.enter)
                 self.kbd_controller.release(Key.enter)
 
                 print(f"[{int((time.time()-start_time)*1000)}] 自动发送完成")
         
-        # 计算总用时
-        end_time = time.time()
-        total_time_ms = int((end_time - start_time) * 1000)
-        
         # 构建状态消息
-        base_msg += f"角色: {character_name}, 表情: {self.preview_emotion}, 背景: {self.preview_background}, 用时: {total_time_ms}ms"
+        base_msg += f"角色: {self.get_character()}, 表情: {self.preview_emotion}, 背景: {self.preview_background}, 用时: {int((time.time() - start_time) * 1000)}ms"
         
         return base_msg
-    
-    def set_status_callback(self, callback):
-        """设置状态更新回调函数"""
-        self.status_callback = callback
-
-    def update_status(self, message: str):
-        """更新状态（供外部调用）"""
-        if self.status_callback:
-            self.status_callback(message)
-
-    def hex_to_rgb(self, hex_color: str) -> tuple:
-        """将十六进制颜色转换为RGB元组"""
-        hex_color = hex_color.lstrip('#')
-        if len(hex_color) == 3:
-            hex_color = ''.join([c*2 for c in hex_color])
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))

@@ -1,12 +1,6 @@
 darwin:
 - QQ.app
 - WeChat.app
-win:
-- TIM.exe
-- QQ.exe
-- WeChat.exe
-- WeChatApp.exe
-- Weixin.exe
 win32:
 - TIM.exe
 - QQ.exe

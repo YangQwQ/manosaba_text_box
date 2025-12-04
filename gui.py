@@ -2,9 +2,7 @@
 
 import tkinter as tk
 from tkinter import ttk
-# from PIL import ImageTk
 import threading
-# import time
 
 from core import ManosabaCore
 from gui_settings import SettingsWindow
@@ -163,7 +161,7 @@ class ManosabaGUI:
             state="readonly",
             width=15,
         )
-        background_count = self.core.image_processor.background_count
+        background_count = self.core.background_count
         self.background_combo["values"] = [
             f"背景 {i}" for i in range(1, background_count + 1)
         ]

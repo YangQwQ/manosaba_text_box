@@ -4,9 +4,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import os
-import yaml
+import re
 import sys
-from path_utils import get_available_fonts, get_resource_path
+from path_utils import get_available_fonts
 
 
 class SettingsWindow:
@@ -40,12 +40,12 @@ class SettingsWindow:
         self.window.transient(parent)
         self.window.grab_set()
 
-        self.setup_ui()
+        self._setup_ui()
 
         # 确保界面状态正确
-        self.setup_model_parameters()
+        self._setup_model_parameters()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         """设置UI界面"""
         # 创建Notebook用于标签页
         notebook = ttk.Notebook(self.window)
@@ -63,25 +63,25 @@ class SettingsWindow:
         hotkey_frame = ttk.Frame(notebook, padding="10")
         notebook.add(hotkey_frame, text="快捷键设置")
 
-        self.setup_general_tab(general_frame)
-        self.setup_whitelist_tab(whitelist_frame)
-        self.setup_hotkey_tab(hotkey_frame)
+        self._setup_general_tab(general_frame)
+        self._setup_whitelist_tab(whitelist_frame)
+        self._setup_hotkey_tab(hotkey_frame)
 
         # 按钮框架
         button_frame = ttk.Frame(self.window)
         button_frame.pack(fill=tk.X, padx=10, pady=10)
 
-        ttk.Button(button_frame, text="保存", command=self.on_save).pack(
+        ttk.Button(button_frame, text="保存", command=self._on_save).pack(
             side=tk.RIGHT, padx=5
         )
         ttk.Button(button_frame, text="取消", command=self.window.destroy).pack(
             side=tk.RIGHT, padx=5
         )
-        ttk.Button(button_frame, text="应用", command=self.on_apply).pack(
+        ttk.Button(button_frame, text="应用", command=self._on_apply).pack(
             side=tk.RIGHT, padx=5
         )
 
-    def setup_general_tab(self, parent):
+    def _setup_general_tab(self, parent):
         """设置常规设置标签页"""
         # 获取情感匹配设置
         sentiment_settings = self.settings.get("sentiment_matching", {})
@@ -106,7 +106,7 @@ class SettingsWindow:
             width=20,
         )
         font_combo.grid(row=0, column=1, sticky=tk.W, pady=5, padx=5)
-        font_combo.bind("<<ComboboxSelected>>", self.on_setting_changed)
+        font_combo.bind("<<ComboboxSelected>>", self._on_setting_changed)
 
         # 字号设置
         ttk.Label(font_frame, text="对话框字号:").grid(
@@ -117,9 +117,9 @@ class SettingsWindow:
             font_frame, textvariable=self.font_size_var, from_=8, to=72, width=10
         )
         font_size_spin.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
-        font_size_spin.bind("<KeyRelease>", self.on_setting_changed)
-        font_size_spin.bind("<<Increment>>", self.on_setting_changed)
-        font_size_spin.bind("<<Decrement>>", self.on_setting_changed)
+        font_size_spin.bind("<KeyRelease>", self._on_setting_changed)
+        font_size_spin.bind("<<Increment>>", self._on_setting_changed)
+        font_size_spin.bind("<<Decrement>>", self._on_setting_changed)
         
         # 字体说明
         ttk.Label(font_frame, text="注：角色名字字体保持不变，使用角色配置中的专用字体", 
@@ -144,7 +144,7 @@ class SettingsWindow:
             width=10
         )
         color_entry.pack(side=tk.LEFT, padx=(0, 5))
-        color_entry.bind("<KeyRelease>", self.on_setting_changed)
+        color_entry.bind("<KeyRelease>", self._on_setting_changed)
         
         # 颜色预览标签
         self.color_preview_label = ttk.Label(
@@ -155,14 +155,11 @@ class SettingsWindow:
             width=3
         )
         self.color_preview_label.pack(side=tk.LEFT)
-        
-        # # 绑定变量变化更新预览
-        # self.text_color_var.trace_add("write", self.update_color_preview)
-        
+
         # 绑定变量变化更新预览
         def on_color_change(*args):
-                self.update_color_preview()
-                self.on_setting_changed()
+                self._update_color_preview()
+                self._on_setting_changed()
             
         self.text_color_var.trace_add("write", on_color_change)
 
@@ -183,7 +180,7 @@ class SettingsWindow:
             width=10
         )
         bracket_color_entry.pack(side=tk.LEFT, padx=(0, 5))
-        bracket_color_entry.bind("<KeyRelease>", self.on_setting_changed)
+        bracket_color_entry.bind("<KeyRelease>", self._on_setting_changed)
         
         # 强调颜色预览标签
         self.bracket_color_preview_label = ttk.Label(
@@ -197,8 +194,8 @@ class SettingsWindow:
         
         # 绑定变量变化更新预览
         def on_bracket_color_change(*args):
-                self.update_bracket_color_preview()
-                self.on_setting_changed()
+                self._update_bracket_color_preview()
+                self._on_setting_changed()
             
         self.bracket_color_var.trace_add("write", on_bracket_color_change)
         
@@ -237,13 +234,13 @@ class SettingsWindow:
             width=15
         )
         ai_model_combo.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
-        ai_model_combo.bind("<<ComboboxSelected>>", self.setup_model_parameters)
+        ai_model_combo.bind("<<ComboboxSelected>>", self._setup_model_parameters)
 
         # 连接测试按钮
         self.test_btn = ttk.Button(
             sentiment_frame,
             text="测试连接",
-            command=self.test_ai_connection,
+            command=self._test_ai_connection,
             width=10
         )
         self.test_btn.grid(row=1, column=2, sticky=tk.W, pady=5, padx=5)
@@ -253,7 +250,7 @@ class SettingsWindow:
         self.params_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
         
         # 初始化参数显示
-        self.setup_model_parameters()
+        self._setup_model_parameters()
 
         # 情感匹配说明
         ttk.Label(sentiment_frame, 
@@ -276,7 +273,7 @@ class SettingsWindow:
             compression_frame,
             text="启用像素削减压缩",
             variable=self.pixel_reduction_var,
-            command=self.on_setting_changed
+            command=self._on_setting_changed
         )
         pixel_reduction_cb.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=5)
 
@@ -300,13 +297,13 @@ class SettingsWindow:
             length=200
         )
         pixel_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        pixel_scale.bind("<ButtonRelease-1>", self.on_setting_changed)
+        pixel_scale.bind("<ButtonRelease-1>", self._on_setting_changed)
         
         self.pixel_value_label = ttk.Label(pixel_frame, text=f"{self.pixel_reduction_ratio_var.get()}%")
         self.pixel_value_label.pack(side=tk.RIGHT, padx=5)
         
         # 绑定变量变化更新标签
-        self.pixel_reduction_ratio_var.trace_add("write", self.update_pixel_label)
+        self.pixel_reduction_ratio_var.trace_add("write", self._update_pixel_label)
 
         # 压缩说明
         ttk.Label(compression_frame, 
@@ -315,7 +312,7 @@ class SettingsWindow:
             row=4, column=0, columnspan=2, sticky=tk.W, pady=2
         )
 
-    def setup_hotkey_tab(self, parent):
+    def _setup_hotkey_tab(self, parent):
         """设置快捷键标签页"""
         # 创建滚动框架
         canvas = tk.Canvas(parent)
@@ -333,14 +330,14 @@ class SettingsWindow:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 从配置文件重新加载快捷键
-        self.original_hotkeys = self.core.config_loader.load_keymap(self.platform_key)
+        self.original_hotkeys = self.core.config_loader.load_config("keymap", platform=self.platform_key)
         hotkeys = self.original_hotkeys
         
         # 生成快捷键放在第一个
         generate_frame = ttk.LabelFrame(scrollable_frame, text="生成控制", padding="10")
         generate_frame.pack(fill=tk.X, pady=5)
 
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             generate_frame,
             "生成图片",
             "start_generate",
@@ -352,14 +349,14 @@ class SettingsWindow:
         char_frame = ttk.LabelFrame(scrollable_frame, text="角色切换", padding="10")
         char_frame.pack(fill=tk.X, pady=5)
 
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             char_frame,
             "向前切换角色",
             "next_character",
             hotkeys.get("next_character", "ctrl+j"),
             0,
         )
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             char_frame,
             "向后切换角色",
             "prev_character",
@@ -371,14 +368,14 @@ class SettingsWindow:
         emotion_frame = ttk.LabelFrame(scrollable_frame, text="表情切换", padding="10")
         emotion_frame.pack(fill=tk.X, pady=5)
 
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             emotion_frame,
             "向前切换表情",
             "next_emotion",
             hotkeys.get("next_emotion", "ctrl+u"),
             0,
         )
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             emotion_frame,
             "向后切换表情",
             "prev_emotion",
@@ -390,14 +387,14 @@ class SettingsWindow:
         bg_frame = ttk.LabelFrame(scrollable_frame, text="背景切换", padding="10")
         bg_frame.pack(fill=tk.X, pady=5)
 
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             bg_frame,
             "向前切换背景",
             "next_background",
             hotkeys.get("next_background", "ctrl+i"),
             0,
         )
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             bg_frame,
             "向后切换背景",
             "prev_background",
@@ -409,7 +406,7 @@ class SettingsWindow:
         control_frame = ttk.LabelFrame(scrollable_frame, text="控制", padding="10")
         control_frame.pack(fill=tk.X, pady=5)
 
-        self.create_hotkey_editable_row(
+        self._create_hotkey_editable_row(
             control_frame,
             "继续/停止监听",
             "toggle_listener",
@@ -439,7 +436,7 @@ class SettingsWindow:
             else:
                 current_display = ""
 
-            self.create_character_hotkey_row(
+            self._create_character_hotkey_row(
                 quick_char_frame,
                 f"快捷键 {i}",
                 f"character_{i}",
@@ -449,7 +446,7 @@ class SettingsWindow:
 i - 1,
             )
 
-    def create_hotkey_editable_row(self, parent, label, key, hotkey_value, row):
+    def _create_hotkey_editable_row(self, parent, label, key, hotkey_value, row):
         """创建可编辑的快捷键显示行"""
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky=tk.W, pady=2)
 
@@ -460,7 +457,7 @@ i - 1,
         entry = ttk.Entry(parent, textvariable=hotkey_var, width=20)
         entry.grid(row=row, column=1, padx=5, pady=2, sticky=tk.W)
 
-    def create_character_hotkey_row(
+    def _create_character_hotkey_row(
         self, parent, label, key, hotkey_value, current_char, character_options, row
     ):
         """创建角色快捷键设置行"""
@@ -478,7 +475,7 @@ i - 1,
             width=25,
         )
         char_combo.grid(row=row, column=1, padx=5, pady=2, sticky=tk.W)
-        char_combo.bind("<<ComboboxSelected>>", self.on_setting_changed)
+        char_combo.bind("<<ComboboxSelected>>", self._on_setting_changed)
 
         # 快捷键显示（只读）
         hotkey_var = tk.StringVar(value=hotkey_value)
@@ -487,7 +484,7 @@ i - 1,
         entry = ttk.Entry(parent, textvariable=hotkey_var, width=15, state="readonly")
         entry.grid(row=row, column=2, padx=5, pady=2, sticky=tk.W)
 
-    def setup_whitelist_tab(self, parent):
+    def _setup_whitelist_tab(self, parent):
         """设置进程白名单标签页"""
         # 创建滚动文本框
         frame = ttk.Frame(parent)
@@ -501,10 +498,10 @@ i - 1,
         self.whitelist_text.pack(fill=tk.BOTH, expand=True, pady=5)
 
         # 从配置文件重新加载白名单内容
-        current_whitelist = self.core.config_loader.load_process_whitelist()
+        current_whitelist = self.core.config_loader.load_config("process_whitelist")
         self.whitelist_text.insert('1.0', '\n'.join(current_whitelist))
 
-    def setup_model_parameters(self, event=None):
+    def _setup_model_parameters(self, event=None):
         """设置模型参数显示"""
         # 清除现有参数控件
         for widget in self.params_frame.winfo_children():
@@ -534,7 +531,7 @@ i - 1,
             width=40
         )
         api_url_entry.grid(row=row, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=2, padx=5)
-        api_url_entry.bind("<KeyRelease>", self.on_setting_changed)
+        api_url_entry.bind("<KeyRelease>", self._on_setting_changed)
         row += 1
         
         # API Key
@@ -551,7 +548,7 @@ i - 1,
             show="*"
         )
         api_key_entry.grid(row=row, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=2, padx=5)
-        api_key_entry.bind("<KeyRelease>", self.on_setting_changed)
+        api_key_entry.bind("<KeyRelease>", self._on_setting_changed)
         row += 1
         
         # 模型名称
@@ -567,7 +564,7 @@ i - 1,
             width=40
         )
         model_name_entry.grid(row=row, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=2, padx=5)
-        model_name_entry.bind("<KeyRelease>", self.on_setting_changed)
+        model_name_entry.bind("<KeyRelease>", self._on_setting_changed)
         row += 1
         
         # 模型描述
@@ -582,7 +579,7 @@ i - 1,
         
         self.params_frame.columnconfigure(1, weight=1)
 
-    def test_ai_connection(self):
+    def _test_ai_connection(self):
         """测试AI连接 - 这会触发模型初始化"""
         selected_model = self.ai_model_var.get()
         if selected_model not in self.ai_models:
@@ -601,11 +598,11 @@ i - 1,
         
         def test_in_thread():
             success = self.core.test_ai_connection(selected_model, config)
-            self.window.after(0, lambda: self.on_connection_test_complete(success))
+            self.window.after(0, lambda: self._on_connection_test_complete(success))
         
         threading.Thread(target=test_in_thread, daemon=True).start()
 
-    def on_connection_test_complete(self, success: bool):
+    def _on_connection_test_complete(self, success: bool):
         """连接测试完成回调"""
         self.test_btn.config(state="normal")
         if success:
@@ -625,14 +622,14 @@ i - 1,
             self.test_btn.config(text="连接失败")
             # 连接失败时，禁用情感匹配
             self.sentiment_enabled_var.set(False)
-            self.on_setting_changed()
+            self._on_setting_changed()
             # 2秒后恢复文本
             self.window.after(2000, lambda: self.test_btn.config(text="测试连接"))
 
-    def update_pixel_label(self, *args):
+    def _update_pixel_label(self, *args):
         """更新像素减少比例标签"""
         self.pixel_value_label.config(text=f"{self.pixel_reduction_ratio_var.get()}%")
-        self.on_setting_changed()
+        self._on_setting_changed()
 
     def _get_available_fonts(self):
         """获取可用字体列表，优先显示项目字体"""
@@ -647,7 +644,7 @@ i - 1,
                 project_fonts.append(font_name)
         return project_fonts
 
-    def on_setting_changed(self, event=None):
+    def _on_setting_changed(self, event=None):
         """设置改变时的回调"""
         # 更新设置字典
         self.settings["font_family"] = self.font_family_var.get()
@@ -655,7 +652,7 @@ i - 1,
 
         # 只在颜色有效时更新设置中的颜色值
         color_value = self.text_color_var.get()
-        if self.validate_color_format(color_value):
+        if self._validate_color_format(color_value):
             # 更新颜色预览
             self.color_preview_label.configure(background=color_value)
             # 更新设置字典中的颜色值
@@ -666,7 +663,7 @@ i - 1,
         
         # 更新强调颜色设置
         bracket_color_value = self.bracket_color_var.get()
-        if self.validate_color_format(bracket_color_value):
+        if self._validate_color_format(bracket_color_value):
             # 更新强调颜色预览
             self.bracket_color_preview_label.configure(background=bracket_color_value)
             # 更新设置字典中的强调颜色值
@@ -714,23 +711,23 @@ i - 1,
 
         self.settings["quick_characters"] = quick_characters
 
-    def on_save(self):
+    def _on_save(self):
         """保存设置并关闭窗口"""
-        if self.on_apply():
+        if self._on_apply():
             self.window.destroy()
 
-    def on_apply(self):
+    def _on_apply(self):
         """应用设置但不关闭窗口"""
         # 验证颜色值
-        if not self.validate_color_format(self.text_color_var.get()):
+        if not self._validate_color_format(self.text_color_var.get()):
             messagebox.showerror("颜色错误", "颜色格式无效，请输入有效的十六进制颜色值（例如：#FFFFFF）")
             return False
         
-        self.on_setting_changed()
+        self._on_setting_changed()
 
         # 检查快捷键是否有更改并保存
         if self._check_hotkeys_changed():
-            if not self.save_hotkey_settings():
+            if not self._save_hotkey_settings():
                 return False
             # 只在快捷键有更改时重新初始化热键管理器
             self.core.reload_configs()
@@ -740,102 +737,44 @@ i - 1,
         # 保存设置到文件
         self.core.save_gui_settings(self.settings)
         # 保存进程白名单
-        self.save_whitelist_settings()
+        self._save_whitelist_settings()
 
         # 应用设置时检查是否需要重新初始化AI模型
         self.core._reinitialize_sentiment_analyzer_if_needed()
         return True
 
-    def save_hotkey_settings(self):
+    def _save_hotkey_settings(self):
         """保存快捷键设置"""
-        # 检查快捷键有效性
-        if not self._validate_hotkeys():
-            return False  # 如果快捷键无效，返回False
-
-        # 加载现有的keymap配置
-        keymap_file = get_resource_path(os.path.join("config", "keymap.yml"))
-        if os.path.exists(keymap_file):
-            with open(keymap_file, 'r', encoding='utf-8') as f:
-                keymap_data = yaml.safe_load(f) or {}
-        else:
-            keymap_data = {}
-
-        # 确保当前平台配置存在
-        if self.platform_key not in keymap_data:
-            keymap_data[self.platform_key] = {}
-
-        # 更新当前平台的快捷键
-        for key in ['start_generate', 'next_character', 'prev_character', 'next_emotion', 'prev_emotion', 
-                   'next_background', 'prev_background', 'toggle_listener']:
-            var_name = f"{key}_hotkey_var"
-            if hasattr(self, var_name):
-                hotkey_var = getattr(self, var_name)
-                keymap_data[self.platform_key][key] = hotkey_var.get()
-
-        # 保存回文件
-        try:
-            os.makedirs(os.path.dirname(keymap_file), exist_ok=True)
-            with open(keymap_file, 'w', encoding='utf-8') as f:
-                yaml.dump(keymap_data, f, allow_unicode=True, default_flow_style=False)
-            
-            # 更新原始快捷键以反映保存状态
-            self.original_hotkeys = keymap_data[self.platform_key]
-            return True
-        except Exception as e:
-            print(f"保存快捷键设置失败: {e}")
-            return False
-    
-    def _validate_hotkeys(self):
-        """验证快捷键输入的有效性"""
-        valid_modifiers = ['ctrl', 'alt', 'shift', 'win']
-        valid_keys = [
-            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 
-            'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-            'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12',
-            'space', 'tab', 'enter', 'esc', 'backspace', 'delete', 'insert', 'home', 'end',
-            'pageup', 'pagedown', 'up', 'down', 'left', 'right'
-        ]
-        
-        # 获取所有快捷键变量
-        hotkey_vars = []
+        # 构建当前平台的新快捷键字典
+        new_hotkeys = {}
         for key in ['start_generate', 'next_character', 'prev_character', 'next_emotion', 'prev_emotion', 
                 'next_background', 'prev_background', 'toggle_listener']:
             var_name = f"{key}_hotkey_var"
             if hasattr(self, var_name):
-                hotkey_vars.append((key, getattr(self, var_name)))
+                hotkey_var = getattr(self, var_name)
+                new_hotkeys[key] = hotkey_var.get()
         
-        # 检查每个快捷键
-        for key_name, hotkey_var in hotkey_vars:
-            hotkey = hotkey_var.get().strip().lower()
-            if not hotkey:
-                continue  # 空快捷键跳过检查
-                
-            # 检查格式：modifier+key 或 modifier+modifier+key
-            parts = hotkey.split('+')
-            if len(parts) < 2 or len(parts) > 3:
-                self._show_hotkey_error(f"快捷键 '{hotkey}' 格式无效，应为：修饰键+按键")
-                return False
-            
-            # 检查修饰键
-            for modifier in parts[:-1]:
-                if modifier not in valid_modifiers:
-                    self._show_hotkey_error(f"快捷键 '{hotkey}' 包含无效修饰键 '{modifier}'")
+        # 检查快捷键有效性
+        for key_name, hotkey in new_hotkeys.items():
+            if hotkey:  # 只检查非空的快捷键
+                is_valid, error_msg = self.core.config_loader.validate_hotkey_format(hotkey)
+                if not is_valid:
+                    messagebox.showerror("快捷键错误", error_msg)
                     return False
-            
-            # 检查主按键
-            main_key = parts[-1]
-            if main_key not in valid_keys:
-                self._show_hotkey_error(f"快捷键 '{hotkey}' 包含无效按键 '{main_key}'")
-                return False
         
-        return True
+        # 使用config_loader保存
+        success = self.core.config_loader.save_keymap(self.platform_key, new_hotkeys)
+        if success:
+            # 更新原始快捷键以反映保存状态
+            self.original_hotkeys = new_hotkeys
+        
+        return success
 
     def _show_hotkey_error(self, message):
         """显示快捷键错误消息"""
         messagebox.showerror("快捷键错误", message)
         
-    def save_whitelist_settings(self):
+    def _save_whitelist_settings(self):
         """保存进程白名单设置"""
         # 从文本框获取内容
         text_content = self.whitelist_text.get('1.0', tk.END).strip()
@@ -864,31 +803,29 @@ i - 1,
 
         return False
 
-    def update_color_preview(self, *args):
+    def _update_color_preview(self, *args):
         """更新颜色预览标签"""
         color_value = self.text_color_var.get()
         # 验证颜色格式
-        if self.validate_color_format(color_value):
+        if self._validate_color_format(color_value):
             # 更新预览标签背景色
             self.color_preview_label.configure(background=color_value)
         else:
             # 如果颜色格式无效，显示默认颜色（保持原样，不更新）
             pass  # 不更新预览，保持之前的状态
     
-    def update_bracket_color_preview(self, *args):
+    def _update_bracket_color_preview(self, *args):
         """更新强调颜色预览标签"""
         color_value = self.bracket_color_var.get()
         # 验证颜色格式
-        if self.validate_color_format(color_value):
+        if self._validate_color_format(color_value):
             # 更新预览标签背景色
             self.bracket_color_preview_label.configure(background=color_value)
         else:
             # 如果颜色格式无效，显示默认颜色（保持原样，不更新）
             pass  # 不更新预览，保持之前的状态
 
-    def validate_color_format(self, color_value):
+    def _validate_color_format(self, color_value):
         """验证颜色格式是否为有效的十六进制颜色"""
-        import re
-        # 匹配 #FFFFFF 格式
         pattern = r'^#([A-Fa-f0-9]{6})$'
         return re.match(pattern, color_value) is not None

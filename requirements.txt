@@ -1,11 +1,9 @@
-pyclip>=0.7.0
 pynput>=1.7.6
-rich
 pyyaml
 Pillow>=12.0.0
 keyboard>=0.13.5
-pyperclip>=1.11.0
 pywin32>=311
 psutil>=5.9.0
 openai
 emoji
+BeautifulSoup4
