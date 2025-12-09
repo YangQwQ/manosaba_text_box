@@ -2,51 +2,38 @@
 
 一个基于Python的自动化表情包生成工具，能够快速生成带有自定义文本的魔法少女的魔女裁判文本框图片。[灵感来源与代码参考](https://github.com/MarkCup-Official/Anan-s-Sketchbook-Chat-Box)
 
-## 修改说明
-本仓库由YangQwQ基于[oplivilqo的项目](https://github.com/oplivilqo/manosaba_text_box)二次开发，基于Tkinter实现了图形化用户界面以及其它实用功能
-
-1. 添加了图片预览功能（会预览下一个发送的图片的样子，即使是随机生成）
-2. 移除了预合成功能，改为实时缓存在内存中，切换角色时释放
-3. 增加了实时预览功能
-3. 添加了随机人物差分和背景的开关
-4. 添加了情感自动匹配功能
-5. 添加了纯本地运行的emoji绘制功能
-6. 添加了设置界面并提供一些基本设置，包括：
-   - 字体字号和颜色设置
-   - 白名单进程编辑
-   - 快捷键设置
-   - 图像压缩设置
-   - 情感匹配设置
-
-## 程序界面  
-<img width="802" height="754" alt="image" src="https://github.com/user-attachments/assets/7cedbf8f-0124-43af-9314-41f1b5611e9b" />
-
-## 设置界面  
-<img width="502" height="782" alt="image" src="https://github.com/user-attachments/assets/474b6a0f-dd80-40a3-b305-81174317e469" />
-
-## 使用须知
-1. 目前程序还有很多细节部分会在后续优化
-2. 有想法随便提，有意思的我会尽力实现
-3. 代码是deepseek写的，补药喷我
-4. 有bug请及时反馈
-
 ## 预览
-<img width="1200" height="390" alt="5f10f4239bc8a82812e505fd0c4f5567" src="https://github.com/user-attachments/assets/6fb46a8d-4fc4-4d10-80a0-ed21fbb428bf" />
+<img width="500" alt="预览 1" src="https://github.com/user-attachments/assets/6fb46a8d-4fc4-4d10-80a0-ed21fbb428bf" />&nbsp;<img width="500" alt="预览 2" src="https://github.com/user-attachments/assets/847c331e-9274-4b60-9b42-af0a80265391" />
+<img width="500" alt="高级预览 1" src="https://github.com/user-attachments/assets/86af2653-99d9-4ed3-99a6-f21380102b93" />&nbsp;<img width="500" alt="高级预览 2" src="https://github.com/user-attachments/assets/0643f205-6fa6-456f-96c6-2fdafda6152e" />
 
-<img width="1200" height="390" alt="96038673678af657e937d20617322e81" src="https://github.com/user-attachments/assets/847c331e-9274-4b60-9b42-af0a80265391" />
+## 分支指引
+由于本项目正在蒸蒸日上（喜，有很多老师都为本项目提交了自己的贡献，但全都挤进主分支有点百家争鸣了（悲
 
-<img width="1280" height="417" alt="abf11ca9-c7e2-45d4-be8b-68ad01626c8e" src="https://github.com/user-attachments/assets/86af2653-99d9-4ed3-99a6-f21380102b93" />
+因此本项目当前使用分支管理各位老师独具匠心的思路，下面提供各分支的预览与指北，可以根据自己的喜好选择合适的分支：
 
-<img width="1280" height="417" alt="ad619121-fffb-407e-8428-a8011b006130" src="https://github.com/user-attachments/assets/0643f205-6fa6-456f-96c6-2fdafda6152e" />
+1. **GUI 用户界面**: 当前的主分支 👈您在这里
+   - 简单易用的用户界面，同时带有预览。适合大多数用户。
+   <img width="600" alt="GUI 用户界面" src="https://github.com/user-attachments/assets/7cedbf8f-0124-43af-9314-41f1b5611e9b" />
 
+2. **[LEGACY 古早版本](https://github.com/oplivilqo/manosaba_text_box/tree/legacy)**: `legacy`分支
+   - 纯命令行界面，监听全局快捷键的古早版本，「但是没bug」。
+   
+3. **其他 tkinter GUI** (现在还没合并但未来可期)
+   - 其他使用tkinter实现的GUI用户界面
+   - 目前还有两位老师正在爆肝：
+      1. @morpheus315 _[PR #32](https://github.com/oplivilqo/manosaba_text_box/pull/32)_: [仓库地址](https://github.com/morpheus315/Text_box-of-mahoushoujo_no_majosaiban-NEO) (已发布Release)
+      2. @thgg678 _[PR #23](https://github.com/oplivilqo/manosaba_text_box/pull/23)_: [仓库地址](https://github.com/thgg678/Text_box-of-mahoushoujo_no_majosaiban)
 
+4. **[textual TUI](https://github.com/oplivilqo/manosaba_text_box/tree/refresh)**: `refresh`分支
+   - 直接在运行终端展示的用户界面，适合少数喜欢终端UI的用户。但暂时无法实现图片预览。
+   ![TUI界面截图](https://github.com/user-attachments/assets/5d1219c4-582f-4573-a605-065d6abc5337)
 
-一个基于Python的自动化表情包生成工具，能够快速生成带有自定义文本的魔法少女的魔女裁判文本框图片。[灵感来源与代码参考](https://github.com/MarkCup-Official/Anan-s-Sketchbook-Chat-Box)
+5. **[JavaScript WebUI](https://github.com/oplivilqo/manosaba_text_box/tree/lite)**: `lite`分支
+   - 无需Python环境，使用浏览器实现的版本。适合偶尔生成图片的用户。
+   ![JS版界面截图](https://github.com/user-attachments/assets/38d0e142-8707-4f43-b1a8-1bb0bcdbe848)
 
-<div align="left">
-
-## 功能特色
-
+## GUI 介绍
+### 功能特色
 - 🎨 内置角色 - 内置14个角色，每个角色多个表情差分
 - ⚡ 图形界面 - 使用Tkinter实现美观的用户界面
 - 🖼️ 智能合成 - 自动合成背景与角色图片
@@ -56,6 +43,19 @@
 - 🔄 实时预览 - 即使随机也能预览合成效果
 - 🔍 实时生成 - 图片缓存在内存中，不占硬盘空间
 - 🔧 高度定制 - 支持自定义角色导入，可配置角色差分和背景是否随机等
+
+### 程序界面  
+<img width="600" alt="GUI 用户界面" src="https://github.com/user-attachments/assets/7cedbf8f-0124-43af-9314-41f1b5611e9b" />
+
+### 设置界面  
+<img width="600" alt="GUI 设置界面" src="https://github.com/user-attachments/assets/474b6a0f-dd80-40a3-b305-81174317e469" />
+
+### 使用须知
+1. 目前程序还有很多细节部分会在后续优化
+2. 有想法随便提，有意思的我会尽力实现
+3. 代码是deepseek写的，补药喷我
+4. 有bug请及时反馈
+
 
 ## 使用方法与配置教程
 参阅[项目Wiki页面](https://github.com/oplivilqo/manosaba_text_box/wiki/GUI-%E5%88%86%E6%94%AF-(%E7%94%A8%E6%88%B7%E7%95%8C%E9%9D%A2))
@@ -67,107 +67,23 @@
 4. 程序界面外观优化? (v1.6)
 5. 支持编辑人物名字的文字样式以及微调人物位置(v1.8)
 
-## BUG记录
+## 已知 BUG
 1. 强调字符只有半边时着色有问题（暂时没想着修）
 2. 复杂的组合emoji无法正常显示，比如 👨‍👩‍👧‍👦 👨🏻‍👩🏼‍👧🏽‍👦🏾
 3. 快捷键编辑页无法用滚轮滚动
 
-## 更新日志
-
-### v1.5
-- 提升图片合成性能（大概省了150ms左右？）
-- 采用纯本地方式绘制emoji，大幅提升效率（从几百ms降至100ms以内）
-- 移除了部分强调字符(英文单引号，括号等)
-- 目前可以同时粘贴文字和图片上去了（仅测试了qq和微信环境）
-- 合并简化了代码
-- 修复了以下bug：
-  + exe程序读取不到文件的bug
-  + 不能把图片粘贴上去的bug
-
-### v1.4
-- 改为使用openai模块与ai通信
-- 修复了ai模型切换时可能出现的bug
-- 标注了部分角色差分的情感，但是我个木头脑袋感觉出来的不一定准，有没有人能帮帮我（
-- 新增了白名单进程编辑功能，增加了快捷键编辑功能（大概有潜在bug）
-- 把压缩移到合成文字阶段处理，小幅提高了合成速度
-- 移除白名单管理页下面的两个按钮
-- 添加了快捷键编辑的按键校验功能
-- 添加了字体颜色和强调颜色设置功能
-- 代码精简，性能优化
-- release已发布
-- 修复了以下bug：
-  + 修复了ai匹配的表情不存在时可能会使用固定表情的bug
-  + 关闭情感匹配后，预览图能正常根据表情配置正常刷新了
-  + 修正了生成图片消息显示存在的一点问题
-  + 修了一下按键检测在中文输入法的输入途中可能发生的bug
-  + 修复了暂停监听快捷键无法重新启用按键监听的bug
-  + 移除了白名单进程页下面的两个按钮
-  + 修复了快捷键每次保存设置都重载的问题
-  + 生成图片事件会在按键释放后执行，防止因为有按键未释放导致剪切失败
-  + 修复了切换角色时表情索引不存在的问题
-  + 修复了ai模型的配置读取bug
-  + 修复了调整窗口大小会刷新预览图的bug
-  + 修复了强调文本的着色和匹配问题
-
-### v1.3
-
-- 新增了快捷切换人物背景的热键（含六个可自定义的快捷角色切换位、上下切换表情/背景/角色的键位以及），但是目前修改键位需要在keymap.yml里改
-- 新增了暂停和启用按键监听的热键，默认为ctrl+alt+p
-- 添加了自定义字体的功能（字体文件需要放在assets/font文件夹中），字体大小也可以在设置中自定义
-- 添加了图像压缩功能（因为剪贴板的特性，所以是直接削减像素压缩）
-- 减少了不必要的copy操作来提升图像合成性能
-- 添加了表情自动匹配功能，可以用deepseek或者在ollama上运行的模型来分析文本情感
-- 修复了以下bug：
-  + emoji绘制功能已修复，初次绘制的emoji可能需要联网获取图像
-  + 修复了合成图片时的多线程导致的性能问题
-
-### v1.2
-
-- 直接把fork来的项目扔给ai重做了
-- 给随机功能添加了开关
-- 移除了预合成功能，改为实时预览，并直接在预览图的基础上合成最后的文字
-- 添加了图片预览功能（会预览下一个发送的图片的样子，即使是随机生成）
-- 精简了部分代码（指删了部分ai写的意义不明的操作）
-- 切换人物时自动释放内存中缓存的图片
-- 修复了以下bug：
-  + 程序最小化后有概率无法正常监听按键
-  + 修复了预览不正常的bug，现在可以正常预览了
-
-### v1.1.5
-
-- 增添了自主切换表情功能
-- 将特殊字体改为红色
-
-
-## 第三方素材声明
-
-本项目使用的表情符号图形（PNG格式）来源于 [Noto Emoji](https://github.com/googlefonts/noto-emoji) 项目。
-- 此部分素材遵循 [SIL Open Font License 1.1](licenses/OFL.txt) 许可证。
-- 原始版权信息与完整声明请参阅项目中的 [`NOTICE.txt`](licenses/NOTICE.txt) 文件。
-
 ### 许可证
-
 本项目基于MIT协议传播，仅供个人学习交流使用，不拥有相关素材的版权。进行分发时应注意不违反素材版权与官方二次创造协定。
 
-## 结语
+背景、立绘等图片素材 © Re,AER LLC./Acacia
 
+表情符号图形（PNG格式）来源于 [Noto Emoji](https://github.com/googlefonts/noto-emoji) 项目，遵循 [SIL Open Font License 1.1](licenses/OFL.txt) 许可
+
+
+## 结语
 受B站上MarkCup做的夏目安安传话筒启发，以夏目安安传话筒为源代码编写了这样一个文本框脚本。
 由于本人是初学者，第一次尝试写这种代码，有许多地方尚有改进的余地，望多多包含。
 
-更新日志怎么写啊
-
 <div align="right">
   
-### 以上. 柊回文————2025.11.15
-
-
-
-
-
-
-
-
-
-
-
-
+### _以上. 柊回文_
