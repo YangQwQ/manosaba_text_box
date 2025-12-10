@@ -304,13 +304,12 @@ def load_background_safe(image_path: str, default_size: tuple = (800, 600), defa
         
         return default_img
 
-
 # 安全加载角色图片（文件不存在时返回默认值）
 def load_character_safe(image_path: str, default_size: tuple = (800, 600), default_color: tuple = (0, 0, 0, 0), emotion_index: int = 0) -> Image.Image:
     """安全加载角色图片，文件不存在时返回默认图片"""
     try:
-        # 直接从缓存加载，应用缩放和偏移
-        cache_key = image_path
+        # 生成不区分格式的缓存键（移除文件扩展名）
+        cache_key = image_path.rsplit('.', 1)[0]  # 移除扩展名
         if cache_key not in _character_cache:
             if image_path and os.path.exists(image_path):
                 img = Image.open(image_path).convert("RGBA")

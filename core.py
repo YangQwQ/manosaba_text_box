@@ -153,13 +153,25 @@ class ManosabaCore:
             # # 将textbox粘贴到画布上
             # canvas.paste(textbox_copy, (0, textbox_y), mask)
         
-        # 4. 加载角色图片
-        overlay_path = get_resource_path(os.path.join(
+        # 4. 加载角色图片（支持多种格式）
+        base_path = get_resource_path(os.path.join(
             "assets",
             "chara",
             character_name,
-            f"{character_name} ({emotion_index}).png"
+            f"{character_name} ({emotion_index})"
         ))
+        
+        overlay_path = None
+        for ext in ['.png', '.jpg', '.jpeg']:
+            test_path = base_path + ext
+            if os.path.exists(test_path):
+                overlay_path = test_path
+                break
+        
+        if overlay_path is None:
+            # 如果所有格式都不存在，使用默认png格式
+            overlay_path = base_path + '.png'
+        
         overlay = load_character_safe(overlay_path, default_size=(800, 600), default_color=(0, 0, 0, 0), emotion_index=emotion_index)
         
         # 计算角色图片粘贴位置（左下角对齐，相对于整个画布）
