@@ -15,16 +15,12 @@ from PIL import Image
 
 from bs4 import BeautifulSoup
 
-# import pyperclip
-# import pyclip
-
 
 PLATFORM = platform.lower()
 
 if PLATFORM.startswith("win"):
     try:
         import win32clipboard
-        import win32con
     except ImportError:
         print("[red]请先安装 Windows 运行库: pip install pywin32[/red]")
         raise

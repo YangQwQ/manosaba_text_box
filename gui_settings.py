@@ -25,6 +25,9 @@ class SettingsWindow:
         self.window.transient(parent)
         self.window.grab_set()
 
+        # 添加窗口关闭事件处理
+        self.window.protocol("WM_DELETE_WINDOW", self._on_close)
+
         self._setup_ui()
 
         # 确保界面状态正确
@@ -68,9 +71,6 @@ class SettingsWindow:
 
     def _setup_general_tab(self, parent):
         """设置常规设置标签页"""
-        # 获取情感匹配设置
-        sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
-        
         # 字体设置
         font_frame = ttk.LabelFrame(parent, text="字体设置", padding="10")
         font_frame.pack(fill=tk.X, pady=5)
@@ -191,60 +191,62 @@ class SettingsWindow:
             row=5, column=0, columnspan=2, sticky=tk.W, pady=2
         )
 
+        # 获取情感匹配设置
+        sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
+        if sentiment_settings.get("display", False):
+            # 情感匹配设置
+            sentiment_frame = ttk.LabelFrame(parent, text="情感匹配设置", padding="10")
+            sentiment_frame.pack(fill=tk.X, pady=5)
 
-        # 情感匹配设置
-        sentiment_frame = ttk.LabelFrame(parent, text="情感匹配设置", padding="10")
-        sentiment_frame.pack(fill=tk.X, pady=5)
+            # 启用情感匹配
+            self.sentiment_enabled_var = tk.BooleanVar(
+                value=sentiment_settings.get("enabled", False)
+            )
 
-        # 启用情感匹配
-        self.sentiment_enabled_var = tk.BooleanVar(
-            value=sentiment_settings.get("enabled", False)
-        )
+            # AI模型选择
+            ttk.Label(sentiment_frame, text="AI模型:").grid(
+                row=1, column=0, sticky=tk.W, pady=5
+            )
+            
+            # 动态获取模型列表
+            model_names = list(CONFIGS.ai_models.keys())
+            self.ai_model_var = tk.StringVar(
+                value=sentiment_settings.get("ai_model", model_names[0] if model_names else "ollama")
+            )
+            ai_model_combo = ttk.Combobox(
+                sentiment_frame,
+                textvariable=self.ai_model_var,
+                values=model_names,
+                state="readonly",
+                width=15
+            )
+            ai_model_combo.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
+            ai_model_combo.bind("<<ComboboxSelected>>", self._setup_model_parameters)
 
-        # AI模型选择
-        ttk.Label(sentiment_frame, text="AI模型:").grid(
-            row=1, column=0, sticky=tk.W, pady=5
-        )
-        
-        # 动态获取模型列表
-        model_names = list(CONFIGS.ai_models.keys())
-        self.ai_model_var = tk.StringVar(
-            value=sentiment_settings.get("ai_model", model_names[0] if model_names else "ollama")
-        )
-        ai_model_combo = ttk.Combobox(
-            sentiment_frame,
-            textvariable=self.ai_model_var,
-            values=model_names,
-            state="readonly",
-            width=15
-        )
-        ai_model_combo.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
-        ai_model_combo.bind("<<ComboboxSelected>>", self._setup_model_parameters)
+            # 连接测试按钮
+            self.test_btn = ttk.Button(
+                sentiment_frame,
+                text="测试连接",
+                command=self._test_ai_connection,
+                width=10
+            )
+            self.test_btn.grid(row=1, column=2, sticky=tk.W, pady=5, padx=5)
 
-        # 连接测试按钮
-        self.test_btn = ttk.Button(
-            sentiment_frame,
-            text="测试连接",
-            command=self._test_ai_connection,
-            width=10
-        )
-        self.test_btn.grid(row=1, column=2, sticky=tk.W, pady=5, padx=5)
+            # 模型参数框架 - 显示所有参数
+            self.params_frame = ttk.Frame(sentiment_frame)
+            self.params_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
+            
+            # 初始化参数显示
+            self._setup_model_parameters()
 
-        # 模型参数框架 - 显示所有参数
-        self.params_frame = ttk.Frame(sentiment_frame)
-        self.params_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
-        
-        # 初始化参数显示
-        self._setup_model_parameters()
+            # 情感匹配说明
+            ttk.Label(sentiment_frame, 
+                    text="注：在主界面点击情感匹配以进行连接，点击测试连接按钮也行", 
+                    font=("", 8), foreground="gray").grid(
+                row=0, column=0, columnspan=3, sticky=tk.W, pady=2
+            )
 
-        # 情感匹配说明
-        ttk.Label(sentiment_frame, 
-                text="注：在主界面点击情感匹配以进行连接，点击测试连接按钮也行", 
-                font=("", 8), foreground="gray").grid(
-            row=0, column=0, columnspan=3, sticky=tk.W, pady=2
-        )
-
-        sentiment_frame.columnconfigure(1, weight=1)
+            sentiment_frame.columnconfigure(1, weight=1)
 
         # 图像压缩设置
         compression_frame = ttk.LabelFrame(parent, text="图像压缩设置", padding="10")
@@ -351,15 +353,15 @@ class SettingsWindow:
         self._create_hotkey_editable_row(
             char_frame,
             "向前切换角色",
-            "next_character",
-            hotkeys.get("next_character", "ctrl+j"),
+            "prev_character",
+            hotkeys.get("prev_character", "ctrl+j"),
             0,
         )
         self._create_hotkey_editable_row(
             char_frame,
             "向后切换角色",
-            "prev_character",
-            hotkeys.get("prev_character", "ctrl+l"),
+            "next_character",
+            hotkeys.get("next_character", "ctrl+l"),
             1,
         )
 
@@ -370,15 +372,15 @@ class SettingsWindow:
         self._create_hotkey_editable_row(
             emotion_frame,
             "向前切换表情",
-            "next_emotion",
-            hotkeys.get("next_emotion", "ctrl+u"),
+            "prev_emotion",
+            hotkeys.get("prev_emotion", "ctrl+u"),
             0,
         )
         self._create_hotkey_editable_row(
             emotion_frame,
             "向后切换表情",
-            "prev_emotion",
-            hotkeys.get("prev_emotion", "ctrl+o"),
+            "next_emotion",
+            hotkeys.get("next_emotion", "ctrl+o"),
             1,
         )
 
@@ -389,15 +391,15 @@ class SettingsWindow:
         self._create_hotkey_editable_row(
             bg_frame,
             "向前切换背景",
-            "next_background",
-            hotkeys.get("next_background", "ctrl+i"),
+            "prev_background",
+            hotkeys.get("prev_background", "ctrl+i"),
             0,
         )
         self._create_hotkey_editable_row(
             bg_frame,
             "向后切换背景",
-            "prev_background",
-            hotkeys.get("prev_background", "ctrl+k"),
+            "next_background",
+            hotkeys.get("next_background", "ctrl+k"),
             1,
         )
 
@@ -516,6 +518,9 @@ class SettingsWindow:
 
     def _setup_model_parameters(self, event=None):
         """设置模型参数显示"""
+        if not CONFIGS.gui_settings["sentiment_matching"].get("display", False):
+            return
+
         # 清除现有参数控件
         for widget in self.params_frame.winfo_children():
             widget.destroy()
@@ -600,14 +605,14 @@ class SettingsWindow:
         ori_key = hotkey_var.get()
 
         # 设置初始文本
-        hotkey_var.set("请输入按键")
-
+        hotkey_var.set("请按下按键组合...")
+        
         # 启动监听线程
         self._current_config_key = key
         self._config_thread_stop = False
         self._config_thread = threading.Thread(
             target=self._key_config_listener,
-            args=(key,ori_key),
+            args=(key, ori_key),
             daemon=True
         )
         self._config_thread.start()
@@ -615,44 +620,65 @@ class SettingsWindow:
     def _key_config_listener(self, key, ori_key):
         """按键配置监听线程"""
         import keyboard
-        import time
         
         hotkey_var = getattr(self, f"{key}_hotkey_var")
-        previous_keys = ""
-        wait_release = False
         
         try:
-            while not self._config_thread_stop:
-                # 获取当前按下的按键
-                current_keys = keyboard.get_hotkey_name()
-                
-                # 如果按下ESC键，退出配置
-                if keyboard.is_pressed('esc'):
-                    def restore_original():
-                        hotkey_var.set(ori_key)
-                    self.window.after(0, restore_original)
-                    break
-                
-                # 如果按键组合发生变化，更新显示
-                if current_keys:
-                    if len(current_keys) > len(previous_keys):
-                        wait_release = True
-                        # 在主线程中更新显示
-                        def update_display():
-                            hotkey_var.set(current_keys)
-                        self.window.after(0, update_display)
-                        previous_keys = current_keys
-                elif wait_release:
-                    break
-                    
-                # 短暂延时
-                time.sleep(0.05)
+            # 监听按键，直到有组合键按下
+            recorded = keyboard.read_hotkey()
+            
+            # 如果按下ESC键，恢复原来的快捷键
+            if recorded == 'esc':
+                def restore_original():
+                    hotkey_var.set(ori_key)
+                self.window.after(0, restore_original)
+                return
+            
+            # 转换按键格式
+            def update_display():
+                converted = self._convert_keyboard_lib_format(recorded)
+                hotkey_var.set(converted)
+            
+            self.window.after(0, update_display)
         
         except Exception as e:
             print(f"按键配置监听出错: {e}")
-        finally:
-            # 线程结束时标记
-            self._config_thread_stop = True
+            def restore_original():
+                hotkey_var.set(ori_key)
+            self.window.after(0, restore_original)
+
+    def _convert_keyboard_lib_format(self, hotkey_str):
+        """将keyboard库的热键字符串转换为我们的格式"""
+        if not hotkey_str:
+            return ""
+        
+        parts = []
+        for part in hotkey_str.lower().split('+'):
+            part = part.strip()
+            
+            # 处理修饰键
+            if part in ['ctrl', 'ctrl_l', 'ctrl_r']:
+                parts.append('ctrl')
+            elif part in ['alt', 'alt_l', 'alt_r']:
+                parts.append('alt')
+            elif part in ['shift', 'shift_l', 'shift_r']:
+                parts.append('shift')
+            elif part in ['windows', 'win', 'win_l', 'win_r']:
+                parts.append('win')
+            elif len(part) == 1:
+                # 单个字符
+                parts.append(part)
+            elif part in ['left', 'right', 'up', 'down']:
+                # 方向键
+                parts.append(part)
+            elif part.startswith('f') and part[1:].isdigit():
+                # 功能键
+                parts.append(part)
+            else:
+                # 其他特殊键
+                parts.append(part)
+        
+        return '+'.join(parts)
 
     def _test_ai_connection(self):
         """测试AI连接 - 这会触发模型初始化"""
@@ -746,24 +772,25 @@ class SettingsWindow:
         else:
             # 颜色无效时，不更新设置字典，保持之前的有效值
             pass
-
-        # 更新情感匹配设置
-        if "sentiment_matching" not in CONFIGS.gui_settings:
-            CONFIGS.gui_settings["sentiment_matching"] = {}
         
-        CONFIGS.gui_settings["sentiment_matching"]["enabled"] = self.sentiment_enabled_var.get()
-        CONFIGS.gui_settings["sentiment_matching"]["ai_model"] = self.ai_model_var.get()
-        
-        # 保存模型配置
-        if "model_configs" not in CONFIGS.gui_settings["sentiment_matching"]:
-            CONFIGS.gui_settings["sentiment_matching"]["model_configs"] = {}
+        if (CONFIGS.gui_settings["sentiment_matching"].get("display",False)):
+            # 更新情感匹配设置
+            if "sentiment_matching" not in CONFIGS.gui_settings:
+                CONFIGS.gui_settings["sentiment_matching"] = {}
             
-        selected_model = self.ai_model_var.get()
-        CONFIGS.gui_settings["sentiment_matching"]["model_configs"][selected_model] = {
-            "base_url": self.api_url_var.get(),
-            "api_key": self.api_key_var.get(),
-            "model": self.model_name_var.get()
-        }
+            CONFIGS.gui_settings["sentiment_matching"]["enabled"] = self.sentiment_enabled_var.get()
+            CONFIGS.gui_settings["sentiment_matching"]["ai_model"] = self.ai_model_var.get()
+            
+            # 保存模型配置
+            if "model_configs" not in CONFIGS.gui_settings["sentiment_matching"]:
+                CONFIGS.gui_settings["sentiment_matching"]["model_configs"] = {}
+                
+            selected_model = self.ai_model_var.get()
+            CONFIGS.gui_settings["sentiment_matching"]["model_configs"][selected_model] = {
+                "base_url": self.api_url_var.get(),
+                "api_key": self.api_key_var.get(),
+                "model": self.model_name_var.get()
+            }
             
         # 更新图像压缩设置
         if "image_compression" not in CONFIGS.gui_settings:
@@ -803,19 +830,29 @@ class SettingsWindow:
         # 保存设置到文件
         CONFIGS.save_gui_settings()
         self._save_whitelist_settings()
-        self._save_hotkey_settings()
+        success = self._save_hotkey_settings()
 
         # 应用设置时检查是否需要重新初始化AI模型
         self.core._reinitialize_sentiment_analyzer_if_needed()
-        return True
+        
+        # 注意：我们不在设置窗口内重启热键监听，由父窗口处理
+        return success
 
+    def _on_close(self):
+        """处理窗口关闭事件"""
+        # 停止按键配置监听线程（如果正在运行）
+        if hasattr(self, '_config_thread') and self._config_thread and self._config_thread.is_alive():
+            self._config_thread_stop = True
+        
+        # 销毁窗口
+        self.window.destroy()
 
     def _save_hotkey_settings(self):
         """保存快捷键设置"""
         # 构建当前平台的新快捷键字典
         new_hotkeys = {}
         
-        # 收集普通快捷键
+        # 收集普通快捷键 - 修复：使用正确的变量名
         for key in ['start_generate', 'next_character', 'prev_character', 'next_emotion', 'prev_emotion', 
                     'next_background', 'prev_background', 'toggle_listener']:
             var_name = f"{key}_hotkey_var"
@@ -826,10 +863,12 @@ class SettingsWindow:
                 if hotkey_value != "请输入按键":
                     new_hotkeys[key] = hotkey_value
         
+        # 修复：确保保存到配置文件
         success = CONFIGS.save_keymap(new_hotkeys)
         if success:
-            # 更新原始快捷键以反映保存状态
-            CONFIGS.keymap = new_hotkeys
+            # 更新当前配置中的快捷键
+            CONFIGS.keymap = new_hotkeys.copy()
+            print(f"热键已保存: {new_hotkeys}")
         
         return success
         

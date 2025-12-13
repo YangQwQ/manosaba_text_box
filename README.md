@@ -49,13 +49,6 @@
 ### 设置界面  
 <img width="600" alt="GUI 设置界面" src="https://github.com/user-attachments/assets/474b6a0f-dd80-40a3-b305-81174317e469" />
 
-### 使用须知
-1. 目前程序还有很多细节部分会在后续优化
-2. 有想法随便提，有意思的我会尽力实现
-3. 代码是deepseek写的，补药喷我
-4. 有bug请及时反馈
-
-
 ## 使用方法与配置教程
 参阅[项目Wiki页面](https://github.com/oplivilqo/manosaba_text_box/wiki/GUI-%E5%88%86%E6%94%AF-(%E7%94%A8%E6%88%B7%E7%95%8C%E9%9D%A2))
 
@@ -65,7 +58,6 @@
 背景、立绘等图片素材 © Re,AER LLC./Acacia
 
 表情符号图形（PNG格式）来源于 [Noto Emoji](https://github.com/googlefonts/noto-emoji) 项目，遵循 [SIL Open Font License 1.1](licenses/OFL.txt) 许可
-
 
 ## 结语
 受B站上MarkCup做的夏目安安传话筒启发，以夏目安安传话筒为源代码编写了这样一个文本框脚本。

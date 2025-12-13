@@ -69,7 +69,13 @@ class ConfigLoader:
         self.process_whitelist = self.load_config("process_whitelist")
 
         self.gui_settings = self.load_config("settings")
+
+        # 设置 display 默认值为 False
+        if "display" not in self.gui_settings["sentiment_matching"]:
+            self.gui_settings["sentiment_matching"]["display"] = False
         self.ai_models = self.gui_settings.get("sentiment_matching", {}).get("model_configs", {})
+        
+        self.gui_settings["sentiment_matching"]["enabled"] &= self.gui_settings["sentiment_matching"]["display"]
         
     def reload_configs(self):
         """重新加载配置（用于热键更新后）"""
@@ -180,6 +186,7 @@ class ConfigLoader:
             "font_size": 110,
             "quick_characters": {},
             "sentiment_matching": {
+                "display": False,
                 "enabled": False
             },
             "image_compression": {

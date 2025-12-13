@@ -42,7 +42,6 @@ class ManosabaGUI:
         # 根据初始状态设置按钮可用性
         self.update_sentiment_button_state()
 
-        
         # 开始预加载状态检查
         self.check_preload_status()
 
@@ -199,16 +198,18 @@ class ManosabaGUI:
             command=self.on_auto_send_changed,
         ).grid(row=0, column=1, sticky=tk.W, padx=5)
 
+        # 只在 display 为 True 时显示情感匹配按钮
         sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
-        self.sentiment_matching_var = tk.BooleanVar(value=sentiment_settings.get("enabled", False))
-        self.sentiment_checkbutton = ttk.Checkbutton(
-            settings_frame,
-            text="情感匹配",
-            variable=self.sentiment_matching_var,
-            command=self.on_sentiment_matching_changed,
-        )
-        self.sentiment_checkbutton.grid(row=0, column=2, sticky=tk.W, padx=5)
-        
+        if sentiment_settings.get("display", False):
+            self.sentiment_matching_var = tk.BooleanVar(value=sentiment_settings.get("enabled", False))
+            self.sentiment_checkbutton = ttk.Checkbutton(
+                settings_frame,
+                text="情感匹配",
+                variable=self.sentiment_matching_var,
+                command=self.on_sentiment_matching_changed,
+            )
+            self.sentiment_checkbutton.grid(row=0, column=2, sticky=tk.W, padx=5)
+            
         # 根据初始状态设置按钮可用性
         self.update_sentiment_button_state()
 
@@ -248,7 +249,17 @@ class ManosabaGUI:
 
     def open_settings(self):
         """打开设置窗口"""
-        SettingsWindow(self.root, self.core, self)
+        # 停止热键监听
+        self.hotkey_manager.stop_hotkey_listener()
+        
+        # 打开设置窗口
+        settings_window = SettingsWindow(self.root, self.core, self)
+        
+        # 设置窗口关闭时的回调
+        self.root.wait_window(settings_window.window)
+        
+        # 设置窗口关闭后重新启动热键监听
+        self.hotkey_manager.setup_hotkeys()
 
     def on_window_resize(self, event):
         """处理窗口大小变化事件 - 调整大小并刷新内容"""
@@ -379,6 +390,9 @@ class ManosabaGUI:
         """更新情感匹配按钮状态"""
         # 根据当前状态设置复选框状态
         sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
+        if not sentiment_settings.get("display", False):
+            return
+
         current_enabled = sentiment_settings.get("enabled", False)
         
         if self.core.sentiment_analyzer_status['initializing']:

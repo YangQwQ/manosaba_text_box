@@ -220,7 +220,7 @@ alisa:
   "恐惧": [2,4]
 coco:
   full_name: 泽渡可可    
-  emotion_count: 5
+  emotion_count: 8
   offset: [-120,190]
   scale: 0.72
   font: font3.ttf

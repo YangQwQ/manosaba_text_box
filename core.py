@@ -1,10 +1,7 @@
 """魔裁文本框核心逻辑"""
 from config import CONFIGS
-from config import CONFIGS
 from clipboard_utils import ClipboardManager
 from sentiment_analyzer import SentimentAnalyzer
-
-from load_utils import clear_cache, load_background_safe, load_character_safe, get_preload_manager, load_image_cached
 
 from load_utils import clear_cache, load_background_safe, load_character_safe, get_preload_manager, load_image_cached
 from path_utils import get_resource_path, get_available_fonts
@@ -18,7 +15,6 @@ import threading
 from pynput.keyboard import Key, Controller
 from sys import platform
 import keyboard as kb_module
-from PIL import Image, ImageDraw, ImageOps
 from PIL import Image, ImageDraw, ImageOps
 from typing import Dict, Any
 
@@ -42,9 +38,6 @@ class ManosabaCore:
         self._preview_emotion = -1
         self._preview_background = -1
         self._current_base_image = None  # 当前预览的基础图片（用于快速生成）
-        self._preview_emotion = -1
-        self._preview_background = -1
-        self._current_base_image = None  # 当前预览的基础图片（用于快速生成）
         
         # 状态更新回调
         self.status_callback = None
@@ -57,10 +50,6 @@ class ManosabaCore:
             'initializing': False,
             'current_config': {}
         }
-        
-        # 初始化预加载管理器
-        self.preload_manager = get_preload_manager()
-        self.preload_manager.set_update_callback(self.update_status)
         
         # 初始化预加载管理器
         self.preload_manager = get_preload_manager()
@@ -82,21 +71,7 @@ class ManosabaCore:
         # 同时预加载背景图片
         self.preload_manager.preload_backgrounds_async()
 
-        # 初始化预加载状态
-        self._preload_status = {
-            'total_items': 0,
-            'loaded_items': 0,
-            'is_complete': False
-        }
-
-        # 修改：只预加载当前角色的图片，而不是所有角色
-        current_character = CONFIGS.get_character()
-        self.preload_manager.preload_character_images_async(current_character)
-        # 同时预加载背景图片
-        self.preload_manager.preload_backgrounds_async()
-
         # 程序启动时检查是否需要初始化
-        sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
         sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
         if sentiment_settings.get("enabled", False):
             self.update_status("检测到启用情感匹配，正在初始化...")
@@ -113,38 +88,11 @@ class ManosabaCore:
     def get_preload_status(self):
         """获取预加载状态"""
         return self.preload_manager.get_preload_status()
-    
-    def get_preload_progress(self):
-        """获取预加载进度"""
-        return self.preload_manager.get_preload_progress()
-
-    def get_preload_status(self):
-        """获取预加载状态"""
-        return self.preload_manager.get_preload_status()
 
     def _generate_base_image_with_text(
         self, character_name: str, background_index: int, emotion_index: int
     ) -> Image.Image:
         """生成带角色文字的基础图片"""
-        # 1. 创建一个2560x854的空白图片（透明背景）
-        canvas = Image.new("RGBA", (2560, 854), (0, 0, 0, 0))
-        
-        # 2. 加载背景图（支持多格式）
-        supported_formats = ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp']
-        background_path = None
-        
-        for ext in supported_formats:
-            test_path = get_resource_path(os.path.join("assets", "background", f"c{background_index}{ext}"))
-            if os.path.exists(test_path):
-                background_path = test_path
-                break
-        
-        if background_path is None:
-            # 如果所有格式都不存在，使用默认png格式
-            background_path = get_resource_path(os.path.join("assets", "background", f"c{background_index}.png"))
-        
-        # 使用背景缓存函数（已包含缩放功能）
-        background = load_background_safe(background_path, default_size=(2560, 854), default_color=(100, 100, 200))
         # 1. 创建一个2560x854的空白图片（透明背景）
         canvas = Image.new("RGBA", (2560, 854), (0, 0, 0, 0))
         
@@ -186,7 +134,6 @@ class ManosabaCore:
             # 左下角对齐位置
             textbox_y = canvas.height - textbox.height
             
-            # 方法1：使用传统的paste方法，但正确处理遮罩
             # 确保textbox是RGBA模式
             if textbox.mode != 'RGBA':
                 textbox = textbox.convert('RGBA')
@@ -196,14 +143,6 @@ class ManosabaCore:
 
             # 使用alpha_composite进行正确的alpha混合
             canvas = Image.alpha_composite(canvas, textbox_layer)
-            # 创建textbox的副本
-            # textbox_copy = textbox.copy()
-            
-            # # 提取alpha通道作为遮罩
-            # mask = textbox.getchannel('A')
-            
-            # # 将textbox粘贴到画布上
-            # canvas.paste(textbox_copy, (0, textbox_y), mask)
         
         # 4. 加载角色图片（支持多种格式）
         base_path = get_resource_path(os.path.join(
@@ -214,7 +153,7 @@ class ManosabaCore:
         ))
         
         overlay_path = None
-        for ext in ['.png', '.jpg', '.jpeg']:
+        for ext in ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp']:
             test_path = base_path + ext
             if os.path.exists(test_path):
                 overlay_path = test_path
@@ -237,10 +176,6 @@ class ManosabaCore:
         namebase_path = get_resource_path(os.path.join("assets", "shader", "namebase.png"))
         if os.path.exists(namebase_path):
             namebase = load_image_cached(namebase_path)
-            # 确保namebase宽度为2560（如果原始尺寸不同，则进行等比缩放）
-            # if namebase.width != 2560:
-            #     # 计算缩放比例和新高度
-            #     width_ratio = 2560 / namebase.width
             new_height = int(namebase.height * 1.3)
             new_width = int(namebase.width * 1.3)
             namebase = namebase.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -256,7 +191,6 @@ class ManosabaCore:
             shadow_color = (0, 0, 0)
 
             for config in CONFIGS.text_configs_dict[character_name]:
-            for config in CONFIGS.text_configs_dict[character_name]:
                 text = config["text"]
                 position = tuple(config["position"])
                 font_color = tuple(config["font_color"])
@@ -264,26 +198,8 @@ class ManosabaCore:
 
                 # 获取字体
                 font_name = CONFIGS.current_character.get("font", "font3.ttf")
-                # 获取字体
-                font_name = CONFIGS.current_character.get("font", "font3.ttf")
                 font = load_font_cached(font_name, font_size)
                 
-                # 调整文字位置
-                # 因为原始位置是基于旧设计的，我们需要转换为新的2560x854画布
-                # 如果原始位置是基于800x600的，可以这样缩放：
-                # scale_x = 2560 / 800  # 宽度缩放比例
-                # scale_y = 854 / 600   # 高度缩放比例
-                # 计算新的位置
-                text_x = int(position[0])
-                # 假设文字在画布底部上方100px的位置
-                text_y = canvas.height - 850 + int(position[1])
-                
-                
-                # 调整文字位置
-                # 因为原始位置是基于旧设计的，我们需要转换为新的2560x854画布
-                # 如果原始位置是基于800x600的，可以这样缩放：
-                # scale_x = 2560 / 800  # 宽度缩放比例
-                # scale_y = 854 / 600   # 高度缩放比例
                 # 计算新的位置
                 text_x = int(position[0])
                 # 假设文字在画布底部上方100px的位置
@@ -300,9 +216,6 @@ class ManosabaCore:
 
                 # 绘制主文字
                 draw.text((text_x, text_y), text, fill=font_color, font=font)
-                draw.text((text_x, text_y), text, fill=font_color, font=font)
-
-        return canvas
         return canvas
 
     def set_gui_callback(self, callback):
@@ -315,7 +228,6 @@ class ManosabaCore:
             if enabled is None:
                 # 如果没有指定enabled，则使用当前设置
                 sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
-                sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
                 enabled = sentiment_settings.get("enabled", False) and initialized
             self.gui_callback(initialized, enabled, initializing)
 
@@ -326,7 +238,6 @@ class ManosabaCore:
                 self.sentiment_analyzer_status['initializing'] = True
                 self._notify_gui_status_change(False, False, True)
                 
-                sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
                 sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
                 if sentiment_settings.get("enabled", False):
                     client_type = sentiment_settings.get("ai_model", "ollama")
@@ -379,7 +290,6 @@ class ManosabaCore:
             return
             
         sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
-        sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
         current_enabled = sentiment_settings.get("enabled", False)
         
         if not current_enabled:
@@ -391,16 +301,10 @@ class ManosabaCore:
                     CONFIGS.gui_settings["sentiment_matching"] = {}
                 CONFIGS.gui_settings["sentiment_matching"]["enabled"] = True
                 CONFIGS.save_gui_settings()
-                if "sentiment_matching" not in CONFIGS.gui_settings:
-                    CONFIGS.gui_settings["sentiment_matching"] = {}
-                CONFIGS.gui_settings["sentiment_matching"]["enabled"] = True
-                CONFIGS.save_gui_settings()
                 self._initialize_sentiment_analyzer_async()
             else:
                 # 如果已初始化，直接启用
                 self.update_status("已启用情感匹配功能")
-                CONFIGS.gui_settings["sentiment_matching"]["enabled"] = True
-                CONFIGS.save_gui_settings()
                 CONFIGS.gui_settings["sentiment_matching"]["enabled"] = True
                 CONFIGS.save_gui_settings()
                 self._notify_gui_status_change(True, True, False)
@@ -409,24 +313,18 @@ class ManosabaCore:
             self.update_status("已禁用情感匹配功能")
             CONFIGS.gui_settings["sentiment_matching"]["enabled"] = False
             CONFIGS.save_gui_settings()
-            CONFIGS.gui_settings["sentiment_matching"]["enabled"] = False
-            CONFIGS.save_gui_settings()
             self._notify_gui_status_change(self.sentiment_analyzer_status['initialized'], False, False)
 
     def _disable_sentiment_matching(self):
         """禁用情感匹配设置"""
         if "sentiment_matching" in CONFIGS.gui_settings:
             CONFIGS.gui_settings["sentiment_matching"]["enabled"] = False
-        if "sentiment_matching" in CONFIGS.gui_settings:
-            CONFIGS.gui_settings["sentiment_matching"]["enabled"] = False
         # 保存设置
-        CONFIGS.save_gui_settings()
         CONFIGS.save_gui_settings()
         self.update_status("情感匹配功能已禁用")
 
     def _reinitialize_sentiment_analyzer_if_needed(self):
         """检查配置是否有变化，如果有变化则重新初始化"""
-        sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
         sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
         if not sentiment_settings.get("enabled", False):
             # 如果功能被禁用，重置状态
@@ -496,8 +394,6 @@ class ManosabaCore:
                 
             current_character = CONFIGS.get_character()
             character_meta = CONFIGS.mahoshojo.get(current_character, {})
-            current_character = CONFIGS.get_character()
-            character_meta = CONFIGS.mahoshojo.get(current_character, {})
             
             # 查找对应情感的表情索引列表
             emotion_indices = character_meta.get(sentiment, [])
@@ -509,7 +405,6 @@ class ManosabaCore:
                 
             # 随机选择一个表情索引
             if emotion_indices:
-                import random
                 return random.choice(emotion_indices)
             else:
                 return None
@@ -528,28 +423,12 @@ class ManosabaCore:
         emotion_index = self._get_emotion_by_sentiment(text)
         if emotion_index:
             CONFIGS.selected_emotion = emotion_index
-            CONFIGS.selected_emotion = emotion_index
             return True
         return False
 
     def switch_character(self, index: int) -> bool:
         """切换到指定索引的角色"""
         clear_cache("character")
-        if 0 < index <= len(CONFIGS.character_list):
-            CONFIGS.current_character_index = index
-            CONFIGS.mahoshojo = CONFIGS.load_config("chara_meta")
-            CONFIGS.character_list = list(CONFIGS.mahoshojo.keys())
-            character_name = CONFIGS.get_character()
-            # 加载当前角色的配置到current_character变量
-            if character_name in CONFIGS.mahoshojo:
-                CONFIGS.current_character = CONFIGS.mahoshojo[character_name]
-            else:
-                CONFIGS.current_character = {}
-            
-            # 修改：切换角色后异步预加载新角色的图片
-            self.update_status(f"正在切换到角色: {character_name}")
-            self.preload_manager.preload_character_images_async(character_name)
-            
         if 0 < index <= len(CONFIGS.character_list):
             CONFIGS.current_character_index = index
             CONFIGS.mahoshojo = CONFIGS.load_config("chara_meta")
@@ -586,10 +465,7 @@ class ManosabaCore:
     def _active_process_allowed(self) -> bool:
         """校验当前前台进程是否在白名单"""
         if not CONFIGS.process_whitelist:
-        if not CONFIGS.process_whitelist:
             return True
-        
-        wl = {name.lower() for name in CONFIGS.process_whitelist}
         
         wl = {name.lower() for name in CONFIGS.process_whitelist}
 
@@ -647,14 +523,9 @@ class ManosabaCore:
         """生成预览图片和相关信息"""
         character_name = CONFIGS.get_character()
         emotion_count = CONFIGS.current_character["emotion_count"]
-        character_name = CONFIGS.get_character()
-        emotion_count = CONFIGS.current_character["emotion_count"]
 
         # 确定表情和背景
         emotion_index = (
-            self._get_random_index(emotion_count, exclude_index=self._preview_emotion)
-            if CONFIGS.selected_emotion is None
-            else CONFIGS.selected_emotion
             self._get_random_index(emotion_count, exclude_index=self._preview_emotion)
             if CONFIGS.selected_emotion is None
             else CONFIGS.selected_emotion
@@ -663,33 +534,24 @@ class ManosabaCore:
             self._get_random_index(CONFIGS.background_count, exclude_index=self._preview_background)
             if CONFIGS.selected_background is None
             else CONFIGS.selected_background
-            self._get_random_index(CONFIGS.background_count, exclude_index=self._preview_background)
-            if CONFIGS.selected_background is None
-            else CONFIGS.selected_background
         )
 
         # 保存预览使用的表情和背景
-        self._preview_emotion = emotion_index
-        self._preview_background = background_index
         self._preview_emotion = emotion_index
         self._preview_background = background_index
 
         # 生成预览图片
         try:
             self._current_base_image = self._generate_base_image_with_text(
-            self._current_base_image = self._generate_base_image_with_text(
                 character_name, background_index, emotion_index
             )
         except:
             self._current_base_image = Image.new("RGB", (400, 300), color="gray")
-            self._current_base_image = Image.new("RGB", (400, 300), color="gray")
 
         # 用于 GUI 预览
         preview_image = self._current_base_image.copy()
-        preview_image = self._current_base_image.copy()
 
         # 构建预览信息 - 显示实际使用的索引值
-        info = f"角色: {character_name}\n表情: {emotion_index:02d}\n背景: {background_index:02d}"
         info = f"角色: {character_name}\n表情: {emotion_index:02d}\n背景: {background_index:02d}"
 
         return preview_image, info
@@ -733,7 +595,6 @@ class ManosabaCore:
         print("读取到图片" if image is not None else "", "读取到文本" if text.strip() else "")
         # 情感匹配处理：仅当启用且只有文本内容时
         sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
-        sentiment_settings = CONFIGS.gui_settings.get("sentiment_matching", {})
 
         if (sentiment_settings.get("enabled", False) and 
             self.sentiment_analyzer_status['initialized'] and
@@ -752,7 +613,6 @@ class ManosabaCore:
             else:
                 self.update_status("情感分析失败，使用默认表情")
                 CONFIGS.selected_emotion = None
-                CONFIGS.selected_emotion = None
                 print(f"[{int((time.time()-start_time)*1000)}] 情感分析失败")
 
         if text == "" and image is None:
@@ -760,7 +620,6 @@ class ManosabaCore:
 
         try:
             # 使用GUI中设置的对话框字体，而不是角色专用字体
-            font_family = CONFIGS.gui_settings.get("font_family")
             font_family = CONFIGS.gui_settings.get("font_family")
 
             # 查找匹配的字体文件
@@ -773,14 +632,10 @@ class ManosabaCore:
             if not font_name:
                 print(f"字体家族 {font_family} 不在可用字体列表中")
                 font_name = CONFIGS.mahoshojo[CONFIGS.get_character()].get("font", "font3.ttf")
-                font_name = CONFIGS.mahoshojo[CONFIGS.get_character()].get("font", "font3.ttf")
 
             # 生成图片
             print(f"[{int((time.time()-start_time)*1000)}] 开始合成图片")
             bmp_bytes = draw_content_auto(
-                image_source=self._current_base_image,
-                top_left=CONFIGS.config.BOX_RECT[0],
-                bottom_right=CONFIGS.config.BOX_RECT[1],
                 image_source=self._current_base_image,
                 top_left=CONFIGS.config.BOX_RECT[0],
                 bottom_right=CONFIGS.config.BOX_RECT[1],
@@ -793,12 +648,8 @@ class ManosabaCore:
                 color=self._hex_to_rgb(CONFIGS.gui_settings.get("text_color", "#FFFFFF")),
                 bracket_color=self._hex_to_rgb(CONFIGS.gui_settings.get("bracket_color", "##EF4F54")),
                 max_font_height=CONFIGS.gui_settings.get("font_size", 120),
-                color=self._hex_to_rgb(CONFIGS.gui_settings.get("text_color", "#FFFFFF")),
-                bracket_color=self._hex_to_rgb(CONFIGS.gui_settings.get("bracket_color", "##EF4F54")),
-                max_font_height=CONFIGS.gui_settings.get("font_size", 120),
                 font_name=font_name,
                 image_padding=12,
-                compression_settings=CONFIGS.gui_settings.get("image_compression", None),
                 compression_settings=CONFIGS.gui_settings.get("image_compression", None),
             )
 
@@ -826,7 +677,6 @@ class ManosabaCore:
 
         # 自动粘贴和发送
         if CONFIGS.config.AUTO_PASTE_IMAGE:
-        if CONFIGS.config.AUTO_PASTE_IMAGE:
             self.kbd_controller.press(Key.ctrl if platform != "darwin" else Key.cmd)
             self.kbd_controller.press("v")
             self.kbd_controller.release("v")
@@ -836,15 +686,12 @@ class ManosabaCore:
                 return "前台应用不在白名单内"
             if CONFIGS.config.AUTO_SEND_IMAGE:
                 time.sleep(0.1)
-            if CONFIGS.config.AUTO_SEND_IMAGE:
-                time.sleep(0.1)
                 self.kbd_controller.press(Key.enter)
                 self.kbd_controller.release(Key.enter)
 
                 print(f"[{int((time.time()-start_time)*1000)}] 自动发送完成")
         
         # 构建状态消息
-        base_msg += f"角色: {CONFIGS.get_character()}, 表情: {self._preview_emotion}, 背景: {self._preview_background}, 用时: {int((time.time() - start_time) * 1000)}ms"
         base_msg += f"角色: {CONFIGS.get_character()}, 表情: {self._preview_emotion}, 背景: {self._preview_background}, 用时: {int((time.time() - start_time) * 1000)}ms"
         
         return base_msg
